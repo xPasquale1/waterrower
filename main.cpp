@@ -8,8 +8,9 @@ extern "C"{
 #include "window.h"
 #include "usb.h"
 #include "font.h"
+#include "gui.h"
 
-HANDLE hDevice = open_device("\\\\.\\COM3", 9600);
+HANDLE hDevice = open_device("\\\\.\\COM6", 19200);
 BYTE receiveBuffer[128];
 BYTE sendBuffer[128];
 static bool running = true;
@@ -45,13 +46,18 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 		getMessages();
 		clear_window();
 		int font_size = 5;
-		int fs2 = font_size*font_size;
-		draw_int(10, 10, font_size, rowingData.dist, RGBA(255, 255, 255));
-		draw_int(10, 10+fs2+5, font_size, rowingData.hrs, RGBA(255, 255, 255));
-		draw_character(10+fs2+5, 10+fs2+5, font_size, ':', RGBA(255, 255, 255));
-		draw_int(10+fs2*2+5, 10+fs2+5, font_size, rowingData.min, RGBA(255, 255, 255));
-		draw_character(10+fs2*3+5, 10+fs2+5, font_size, ':', RGBA(255, 255, 255));
-		draw_int(10+fs2*4+5, 10+fs2+5, font_size, rowingData.sec, RGBA(255, 255, 255));
+		int char_offset = font_size*5+1;
+		//Distanzdisplay
+		int offset = draw_int(10, 10, font_size, rowingData.dist, RGBA(255, 255, 255));
+		draw_character(10+char_offset*offset, 10, font_size, 'm', RGBA(255, 255, 255));
+		//Zeitdisplay
+		offset = draw_int(10, 10+char_offset+5, font_size, rowingData.hrs, RGBA(255, 255, 255));
+		draw_character(10+char_offset*offset, 10+char_offset+5, font_size, ':', RGBA(255, 255, 255));
+		++offset;
+		offset += draw_int(10+char_offset*offset, 10+char_offset+5, font_size, rowingData.min, RGBA(255, 255, 255));
+		draw_character(10+char_offset*offset, 10+char_offset+5, font_size, ':', RGBA(255, 255, 255));
+		++offset;
+		draw_int(10+char_offset*offset, 10+char_offset+5, font_size, rowingData.sec, RGBA(255, 255, 255));
 		draw();
 
 		refreshData();
@@ -86,28 +92,25 @@ LRESULT CALLBACK window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
         break;
 	}
 	case WM_LBUTTONDOWN:{
-		if(!mouse.lmb){
-			addRequest(0);
-			addRequest(1);
-			addRequest(2);
-			addRequest(3);
+		if(!getButton(mouse, MOUSE_LMB)){
+
 		};
-		mouse.lmb = true;
+		setButton(mouse, MOUSE_LMB);
 		break;
 	}
 	case WM_LBUTTONUP:{
-		mouse.lmb = false;
+		resetButton(mouse, MOUSE_LMB);
 		break;
 	}
 	case WM_RBUTTONDOWN:{
-		if(!mouse.rmb){
-			addRequest(2);
+		if(getButton(mouse, MOUSE_RMB)){
+
 		};
-		mouse.rmb = true;
+		setButton(mouse, MOUSE_RMB);
 		break;
 	}
 	case WM_RBUTTONUP:{
-		mouse.rmb = false;
+		resetButton(mouse, MOUSE_RMB);
 		break;
 	}
 	case WM_MOUSEMOVE:{

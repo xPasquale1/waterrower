@@ -1,3 +1,4 @@
+#pragma once
 #include <iostream>
 #include <winusb.h>
 extern "C"{
@@ -145,7 +146,7 @@ struct Request{
 	BYTE length;	//Länge der Nachricht
 };
 static SYSTEMTIME last_request_tp = {};
-#define REQUEST_QUEUE_SIZE 40
+#define REQUEST_QUEUE_SIZE 50
 static Request requests[REQUEST_QUEUE_SIZE];
 static int request_ptr1 = 0;
 static int request_ptr2 = 0;

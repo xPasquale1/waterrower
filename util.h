@@ -12,11 +12,16 @@ struct ivec2{
 	bool rmb;
 };
 
-struct mouse{
+struct Mouse{
 	ivec2 pos;
-	bool lmb = false;
-	bool rmb = false;
-} mouse;
+	char button=0;	//Bits: LMB, RMB, Rest ungenutzt
+}; static Mouse mouse;
+enum MOUSEBUTTON{
+	MOUSE_LMB=1, MOUSE_RMB=2
+};
+inline constexpr bool getButton(Mouse& mouse, MOUSEBUTTON button){return (mouse.button & button);}
+inline constexpr void setButton(Mouse& mouse, MOUSEBUTTON button){mouse.button |= button;}
+inline constexpr void resetButton(Mouse& mouse, MOUSEBUTTON button){mouse.button &= ~button;}
 
 class Timer{
     using clock = std::chrono::system_clock;

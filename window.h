@@ -5,8 +5,8 @@
 
 #include "util.h"
 
-static uint window_width = 600;		//Größe des Fensters
-static uint window_height = 600;
+static uint window_width = 800;		//Größe des Fensters
+static uint window_height = 800;
 static uint pixel_size = 2;
 static uint buffer_width = window_width/pixel_size;
 static uint buffer_height = window_height/pixel_size;

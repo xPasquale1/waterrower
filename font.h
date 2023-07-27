@@ -17,12 +17,13 @@ inline void draw_number(uint x, uint y, uint size, uchar number, uint color){
 }
 
 static int _rec_offset = 0;
-void _number_recurse(uint x, uint y, uint size, int num, uint color, int iter){
+int _number_recurse(uint x, uint y, uint size, int num, uint color, int iter){
 	if(num > 0){
 		++_rec_offset;
 		_number_recurse(x, y, size, num/10, color, iter+1);
 		draw_number(x+(_rec_offset-iter-1)*5*size, y, size, num%10, color);
 	}
+	return _rec_offset;
 }
 
 void draw_character(uint x, uint y, uint size, uchar character, uint color){
@@ -35,10 +36,11 @@ void draw_character(uint x, uint y, uint size, uchar character, uint color){
 	}
 }
 
-void draw_int(uint x, uint y, uint size, int num, uint color){
+//Gibt die Anzahl der gezeichneten Zeichen zurück
+int draw_int(uint x, uint y, uint size, int num, uint color){
 	if(num == 0){
 		draw_number(x, y, size, 0, color);
-		return;
+		return 1;
 	}
 	_rec_offset = 0;
 	if(num < 0){
@@ -46,5 +48,5 @@ void draw_int(uint x, uint y, uint size, int num, uint color){
 		num *= -1;
 		draw_character(x, y, size, '-', color);
 	}
-	_number_recurse(x, y, size, num, color, 0);
+	return _number_recurse(x, y, size, num, color, 0);
 }
