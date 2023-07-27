@@ -6,7 +6,7 @@
 
 //Geht nur von 0-9!!!
 //TODO alle Funktionen hier sind nur auf die 5x5 font abgestimmt, sollte man verallgemeinern
-inline void draw_number(uint x, uint y, uint size, uchar number, uint color){
+inline void draw_number(uint x, uint y, uint size, BYTE number, uint color){
 	short idx = (number+48)*5;
 	for(uint i=0; i < 5; ++i){
 		for(uint j=0; j < 5; ++j){
@@ -26,7 +26,7 @@ int _number_recurse(uint x, uint y, uint size, int num, uint color, int iter){
 	return _rec_offset;
 }
 
-void draw_character(uint x, uint y, uint size, uchar character, uint color){
+void draw_character(uint x, uint y, uint size, BYTE character, uint color){
 	short idx = character*5;
 	for(uint i=0; i < 5; ++i){
 		for(uint j=0; j < 5; ++j){

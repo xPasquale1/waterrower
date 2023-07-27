@@ -1,15 +1,16 @@
 #pragma once
 
+#include <fstream>
 #include "util.h"
 #include "font.h"
 
-int _defaultEvent(void){return 0;}
+ErrCode _defaultEvent(void){return SUCCESS;}
 struct Button{
-	int (*event)(void)=&_defaultEvent;	//Funktionspointer zu einer Funktion die gecallt werden soll wenn der Button gedrückt wird
+	ErrCode (*event)(void)=&_defaultEvent;	//Funktionspointer zu einer Funktion die gecallt werden soll wenn der Button gedrückt wird
 	std::string text;
 	ivec2 pos;
 	ivec2 size;
-	uchar state=0;	//Bits: Sichtbarkeit, Maus hover aktiv, Maus hover state, Button gedrückt, Rest ungenutzt
+	BYTE state=0;	//Bits: Sichtbarkeit, Maus hover aktiv, Maus hover state, Button gedrückt, Rest ungenutzt
 	uint color = RGBA(120, 120, 120);
 	uint hover_color = RGBA(120, 120, 255);
 	uint textcolor = RGBA(180, 180, 180);
@@ -28,7 +29,7 @@ inline void buttonsClicked(Button* buttons, uint button_count, Mouse& mouse){
 		if(delta.x >= 0 && delta.x <= b.size.x && delta.y >= 0 && delta.y <= b.size.y){
 			if(checkButtonState(b, BUTTON_CAN_HOVER)) b.state |= BUTTON_HOVER;
 			if(getButton(mouse, MOUSE_LMB) && !checkButtonState(b, BUTTON_PRESSED)){
-				b.event();
+				ErrCheck(b.event());
 				b.state |= BUTTON_PRESSED;
 			}
 			else if(!getButton(mouse, MOUSE_LMB)) b.state &= ~BUTTON_PRESSED;
@@ -58,7 +59,7 @@ inline void updateButtons(Button* buttons, uint button_count, Mouse& mouse){
 struct Menu{
 	Button* buttons;
 	uint button_count=0;
-	uchar state=0;	//Bits: offen, toggle bit für offen, Rest ungenutzt
+	BYTE state=0;	//Bits: offen, toggle bit für offen, Rest ungenutzt
 	ivec2 pos = {};	//Position in Bildschirmpixelkoordinaten, buttons bekommen zusätzlich diesen offset
 };
 enum MENUSTATE{
@@ -68,5 +69,56 @@ inline constexpr bool checkMenuState(Menu& menu, MENUSTATE state){return (menu.s
 inline void updateMenu(Menu& menu, Mouse& mouse){
 	if(checkMenuState(menu, MENU_OPEN)){
 		updateButtons(menu.buttons, menu.button_count, mouse);
+	}
+}
+struct Image{
+	uint* data = nullptr;
+	WORD width = 0;		//x-Dimension
+	WORD height = 0;	//y-Dimension
+};
+ErrCode load_image(const char* name, Image& image){
+	std::fstream file; file.open(name, std::ios::in);
+	if(!file.is_open()) return FILE_NOT_FOUND;
+	//Lese Breite und Höhe
+	std::string word;
+	file >> word;
+	image.width = std::atoi(word.c_str());
+	file >> word;
+	image.height = std::atoi(word.c_str());
+	image.data = new(std::nothrow) uint[image.width*image.height];
+	if(!image.data) return BAD_ALLOC;
+	for(uint i=0; i < image.width*image.height; ++i){
+		file >> word;
+		BYTE r = std::atoi(word.c_str());
+		file >> word;
+		BYTE g = std::atoi(word.c_str());
+		file >> word;
+		BYTE b = std::atoi(word.c_str());
+		image.data[i] = RGBA(r, g, b);
+	}
+	return SUCCESS;
+}
+
+void destroy_image(Image& image){
+	delete[] image.data;
+}
+
+//x und y von 0 - 1
+inline uint get_image(Image& image, float x, float y){
+	uint ry = y*image.height;
+	uint rx = x*(image.width-1);
+	return image.data[ry*image.width+rx];
+}
+
+//Kopiert das gesamte Image in den angegebenen Bereich von start_x bis end_x und start_y bis end_y
+//TODO Kopiere nicht das gesamte Image, sondern auch das sollte man angeben können
+void copy_image_to_window(Image& image, int start_x, int start_y, int end_x, int end_y){
+	for(int y=start_y; y < end_y; ++y){
+		float scaled_y = (float)(y-start_y)/(end_y-start_y);
+		for(int x=start_x; x < end_x; ++x){
+			uint ry = scaled_y*image.height;
+			uint rx = (float)(x-start_x)/(end_x-start_x)*(image.width-1);
+			memory[y*buffer_width+x] = image.data[ry*image.width+rx];
+		}
 	}
 }

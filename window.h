@@ -35,6 +35,13 @@ void init_window(HINSTANCE hInstance){
 	bitmapInfo.bmiHeader.biPlanes = 1;
 	bitmapInfo.bmiHeader.biBitCount = 32;
 	bitmapInfo.bmiHeader.biCompression = BI_RGB;
+
+	memory = new uint[buffer_width*buffer_height];
+}
+
+void close_window(){
+	DestroyWindow(window);
+	delete[] memory;
 }
 
 inline void getMessages()noexcept{
@@ -53,10 +60,10 @@ inline void clear_window()noexcept{
 	}
 }
 
-inline constexpr uint RGBA(uchar r, uchar g, uchar b, uchar a=255){return uint(b|g<<8|r<<16|a<<24);}
-inline constexpr uchar R(uint color){return uchar(color>>16);}
-inline constexpr uchar G(uint color){return uchar(color>>8);}
-inline constexpr uchar B(uint color){return uchar(color);}
+inline constexpr uint RGBA(BYTE r, BYTE g, BYTE b, BYTE a=255){return uint(b|g<<8|r<<16|a<<24);}
+inline constexpr BYTE R(uint color){return BYTE(color>>16);}
+inline constexpr BYTE G(uint color){return BYTE(color>>8);}
+inline constexpr BYTE B(uint color){return BYTE(color);}
 
 inline void draw()noexcept{
 	HDC hdc = GetDC(window);

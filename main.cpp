@@ -30,10 +30,10 @@ void refreshData(WORD interval=250){
 	currentmilli += last_request_tp2.wHour*3600000;
 	if(newmilli - currentmilli > interval){
 		last_request_tp2 = systemTime;
-		addRequest(0);
-		addRequest(1);
-		addRequest(2);
-		addRequest(3);
+		ErrCheck(addRequest(0));
+		ErrCheck(addRequest(1));
+		ErrCheck(addRequest(2));
+		ErrCheck(addRequest(3));
 	}
 }
 
@@ -42,9 +42,15 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 	init_communication(hDevice, sendBuffer, receiveBuffer);
 
+	Image imag;
+	if(load_image("textures/test2.tex", imag) != SUCCESS){
+		return -1;
+	}
+
 	while(running){
 		getMessages();
 		clear_window();
+		copy_image_to_window(imag, 0, 0, mouse.pos.x, mouse.pos.y);
 		int font_size = 5;
 		int char_offset = font_size*5+1;
 		//Distanzdisplay
@@ -70,9 +76,11 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	}
 
 	//Aufräumen
+	destroy_image(imag);
 	strcpy((char*)sendBuffer, "EXIT");
 	sendPacket(hDevice, sendBuffer, sizeof("EXIT")-1);
 	CloseHandle(hDevice);
+	close_window();
 	return 0;
 }
 

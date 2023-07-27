@@ -1,8 +1,8 @@
 #pragma once
 
-#include <chrono>
+#include <iostream>
 
-typedef unsigned char uchar;
+typedef unsigned char BYTE;
 typedef unsigned int uint;
 
 struct ivec2{
@@ -11,6 +11,42 @@ struct ivec2{
 	bool lmb;
 	bool rmb;
 };
+
+//Error-Codes
+enum ErrCode{
+	SUCCESS = 0,
+	BAD_ALLOC,
+	TEXTURE_NOT_FOUND,
+	MODEL_NOT_FOUND,
+	FILE_NOT_FOUND,
+	QUEUE_FULL
+};
+enum ErrCodeFlags{
+	NO_ERR_FLAG = 0,
+	NO_ERR_OUTPUT,
+	ERR_ON_FATAL
+};
+inline constexpr int ErrCheck(ErrCode code, const char* msg="\0", ErrCodeFlags flags=NO_ERR_FLAG){
+	switch(code){
+	case BAD_ALLOC:
+		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[BAD_ALLOC ERROR]" << msg << std::endl;
+		return ERR_ON_FATAL;
+	case TEXTURE_NOT_FOUND:
+		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[TEXTURE_NOT_FOUND ERROR]" << msg << std::endl;
+		return 0;
+	case MODEL_NOT_FOUND:
+		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[MODEL_NOT_FOUND ERROR]" << msg << std::endl;
+		return 0;
+	case FILE_NOT_FOUND:
+		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[FILE_NOT_FOUND ERROR]" << msg << std::endl;
+		return 0;
+	case QUEUE_FULL:
+		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[QUEUE_FULL ERROR]" << msg << std::endl;
+		return 0;
+	default: return 0;
+	}
+	return 0;
+}
 
 struct Mouse{
 	ivec2 pos;
@@ -22,32 +58,3 @@ enum MOUSEBUTTON{
 inline constexpr bool getButton(Mouse& mouse, MOUSEBUTTON button){return (mouse.button & button);}
 inline constexpr void setButton(Mouse& mouse, MOUSEBUTTON button){mouse.button |= button;}
 inline constexpr void resetButton(Mouse& mouse, MOUSEBUTTON button){mouse.button &= ~button;}
-
-class Timer{
-    using clock = std::chrono::system_clock;
-    clock::time_point m_time_point;
-    uchar m_avg_idx = 0;
-    float m_avg[8] = {0};
-public:
-    Timer() : m_time_point(clock::now()){}
-    ~Timer(){}
-    void start(void){
-        m_time_point = clock::now();
-    }
-    float measure_s(void) const {
-        const std::chrono::duration<float> difference = clock::now() - m_time_point;
-        return difference.count();
-    }
-    float measure_ms(void) const {
-        const std::chrono::duration<float, std::milli> difference = clock::now() - m_time_point;
-        return difference.count();
-    }
-    float average_ms_qstring(void){
-        float out = 0;
-        const std::chrono::duration<float, std::milli> difference = clock::now() - m_time_point;
-        m_avg[m_avg_idx++] = difference.count();
-        if(m_avg_idx > 7) m_avg_idx = 0;
-        for(uchar i=0; i < 8; ++i){out += *(m_avg+i);}
-        return out/8.;
-    }
-};

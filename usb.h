@@ -5,6 +5,7 @@ extern "C"{
 	#include <hidsdi.h>
 }
 #include <setupapi.h>
+#include "util.h"
 
 //ret: Handle für das Gerät
 HANDLE open_device(const char* devicePath = "\\\\.\\COM3", DWORD baudrate = 9600){
@@ -45,13 +46,12 @@ HANDLE open_device(const char* devicePath = "\\\\.\\COM3", DWORD baudrate = 9600
 	return hDevice;
 }
 
-//ret: Anzahl der gesendeten Bytes
+//ret: Anzahl der gesendeten Bytes, -1 bei Fehler
 int sendData(HANDLE hDevice, BYTE* data, DWORD length){
 	DWORD bytesSent;
 	if(!WriteFile(hDevice, data, length, &bytesSent, 0)){
 		std::cout << "Fehler beim Senden der Daten! " << GetLastError() << std::endl;
-		CloseHandle(hDevice);
-		exit(-1);
+		return -1;
 	}
 	return bytesSent;
 }
@@ -62,30 +62,27 @@ int readData(HANDLE hDevice, BYTE* data, DWORD length){
 	DWORD bytesRead;
 	if(!ReadFile(hDevice, data, length, &bytesRead, 0)){
 		std::cout << "Fehler beim Lesen der Daten! " << GetLastError() << std::endl;
-		CloseHandle(hDevice);
-		exit(-1);
+		return -1;
 	}
 	return bytesRead;
 }
 
 //Liest die Daten im Empfangspuffer eins nach dem anderen, liest solange bis ein CRLF am ende der Daten steht
-//Gibt -1 zurück, falls keien Daten im Empfangspuffer sind, oder 50Bytes überschritten wurden
+//Gibt -1 zurück, falls keien Daten im Empfangspuffer sind, oder 50Bytes überschritten wurden, oder API Fehler
 int readPacket(HANDLE hDevice, BYTE* data, DWORD length){
 	DWORD bytesRead;
 	DWORD currentRead = 0;
 	BYTE byte;
 	if(!ReadFile(hDevice, &byte, 1, &bytesRead, 0)){
 		std::cout << "Fehler beim Lesen der Daten! " << GetLastError() << std::endl;
-		CloseHandle(hDevice);
-		exit(-1);
+		return -1;
 	}
 	if(bytesRead <= 0) return -1;
 	data[currentRead++] = byte;
 	while(1){
 		if(!ReadFile(hDevice, &byte, 1, &bytesRead, 0)){
 			std::cout << "Fehler beim Lesen der Daten! " << GetLastError() << std::endl;
-			CloseHandle(hDevice);
-			exit(-1);
+			return -1;
 		}
 		if(bytesRead > 0) data[currentRead++] = byte;
 		if(currentRead > 50) return -1;
@@ -96,7 +93,7 @@ int readPacket(HANDLE hDevice, BYTE* data, DWORD length){
 }
 
 //Sendet die Daten mit allen nötigen zusätzlichen Zeichen (max. 48 Bytes Nutzdaten)
-//-1 falls Daten mehr wie 48 Byte enthalten
+//-1 falls Daten mehr wie 48 Byte enthalten oder API Fehler
 int sendPacket(HANDLE hDevice, BYTE* data, DWORD length){
 	if(length > 48) return -1;
 	BYTE packet[50];
@@ -107,8 +104,7 @@ int sendPacket(HANDLE hDevice, BYTE* data, DWORD length){
 	DWORD bytesSent;
 	if(!WriteFile(hDevice, packet, length, &bytesSent, 0)){
 		std::cout << "Fehler beim Senden der Daten! " << GetLastError() << std::endl;
-		CloseHandle(hDevice);
-		exit(-1);
+		return -1;
 	}
 	return bytesSent;
 }
@@ -138,7 +134,7 @@ int init_communication(HANDLE hDevice, BYTE* sendBuffer, BYTE* receiveBuffer){
 
 /* Der Waterrower sollte nicht mit Packeten überlastet werden, daher wird empfohlen nur ca. alle 25ms ein Packet zu senden
    Diese Funktionen senden requests für e.g. Speicherdaten,... indem die Packete in eine Warteschlange eingereiht werden
-   und alle 25ms das erste gesendet wird
+   und alle 25ms das Erste gesendet wird
 */
 
 struct Request{
@@ -152,8 +148,8 @@ static int request_ptr1 = 0;
 static int request_ptr2 = 0;
 
 //Fügt eine request in die Warteschlange ein, id gibt die request an
-int addRequest(DWORD id){
-	if((request_ptr1+1)%(REQUEST_QUEUE_SIZE) == request_ptr2) return -1;	//Warteschlange voll
+ErrCode addRequest(DWORD id){
+	if((request_ptr1+1)%(REQUEST_QUEUE_SIZE) == request_ptr2) return QUEUE_FULL;	//Warteschlange voll
 	switch(id){
 	case 0:{	//Distanzabfrage
 		strcpy((char*)requests[request_ptr1].data, "IRT057");
@@ -177,10 +173,11 @@ int addRequest(DWORD id){
 	}
 	}
 	request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
-	return 0;
+	return SUCCESS;
 }
 
 //Diese Funktion sendet die erste request aus der Warteschlange zum waterrower sobald 25ms seit der Letzten verstrichen sind
+//TODO idk warum diese Funktion einen Rückgabewert hat
 int transmitRequests(HANDLE hDevice){
 	if(request_ptr1 == request_ptr2) return 1;	//Keine Daten in der Warteschlange
 	SYSTEMTIME systemTime;
@@ -214,6 +211,8 @@ constexpr inline int codeToInt(const char* code){
 	return (code[0]|code[1]<<8|code[2]<<16);
 }
 
+//TODO idk warum diese Funktion einen Rückgabewert hat
+//ich meine man könnte es asl einen Fehler ansehen wenn es den Code nicht gibt...
 int checkCode(BYTE* receiveBuffer, int length){
 	BYTE code[3]; code[0] = receiveBuffer[0]; code[1] = receiveBuffer[1]; code[2] = receiveBuffer[2];
 	switch(codeToInt((char*)code)){
