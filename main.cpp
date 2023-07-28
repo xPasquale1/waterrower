@@ -7,16 +7,17 @@ extern "C"{
 #include <thread>
 #include "window.h"
 #include "usb.h"
-#include "font.h"
-#include "gui.h"
+#include "pages.h"
 
-HANDLE hDevice = open_device("\\\\.\\COM6", 19200);
+//HANDLE hDevice = open_device("\\\\.\\COM6", 19200);
 BYTE receiveBuffer[128];
 BYTE sendBuffer[128];
-static bool running = true;
+Page main_page;
 
 SYSTEMTIME last_request_tp2 = {};
 //Intervall in Millisekunden, sollte nicht < 26 sein
+ErrCode loadStartPage();
+ErrCode loadFreeTrainingPage();
 void refreshData(WORD interval=250){
 	SYSTEMTIME systemTime;
 	GetSystemTime(&systemTime);
@@ -37,66 +38,51 @@ void refreshData(WORD interval=250){
 	}
 }
 
+void displayDataPage(){
+	main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist);
+	main_page.menus[0]->labels[1].text = "Zeit: " + std::to_string(rowingData.hrs) + ':' + std::to_string(rowingData.min) + ':' + std::to_string(rowingData.sec);
+}
+
 INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){
-	init_window(hInstance);
+	HWND main_window;
+	ErrCheck(openWindow(hInstance, 800, 800, 2, main_window), "open main window");
 
-	init_communication(hDevice, sendBuffer, receiveBuffer);
+//	init_communication(hDevice, sendBuffer, receiveBuffer);
+	ErrCheck(loadStartPage(), "laden des Startbildschirms");
 
-	Image imag;
-	if(load_image("textures/test2.tex", imag) != SUCCESS){
-		return -1;
-	}
+	while(app.window_count){
+		ErrCheck(clearWindow(main_window), "clear window");
 
-	while(running){
-		getMessages();
-		clear_window();
-		copy_image_to_window(imag, 0, 0, mouse.pos.x, mouse.pos.y);
-		int font_size = 5;
-		int char_offset = font_size*5+1;
-		//Distanzdisplay
-		int offset = draw_int(10, 10, font_size, rowingData.dist, RGBA(255, 255, 255));
-		draw_character(10+char_offset*offset, 10, font_size, 'm', RGBA(255, 255, 255));
-		//Zeitdisplay
-		offset = draw_int(10, 10+char_offset+5, font_size, rowingData.hrs, RGBA(255, 255, 255));
-		draw_character(10+char_offset*offset, 10+char_offset+5, font_size, ':', RGBA(255, 255, 255));
-		++offset;
-		offset += draw_int(10+char_offset*offset, 10+char_offset+5, font_size, rowingData.min, RGBA(255, 255, 255));
-		draw_character(10+char_offset*offset, 10+char_offset+5, font_size, ':', RGBA(255, 255, 255));
-		++offset;
-		draw_int(10+char_offset*offset, 10+char_offset+5, font_size, rowingData.sec, RGBA(255, 255, 255));
-		draw();
+		updatePage(main_page, main_window);
 
-		refreshData();
-		transmitRequests(hDevice);
+		ErrCheck(drawWindow(main_window), "draw window");
 
-		int length = readPacket(hDevice, receiveBuffer, 128);
-		if(length > 0){
-			checkCode(receiveBuffer, length);
-		}
+//		refreshData();
+//		transmitRequests(hDevice);
+
+//		int length = readPacket(hDevice, receiveBuffer, 128);
+//		if(length > 0){
+//			checkCode(receiveBuffer, length);
+//		}
+		getMessages();	//TODO frägt alle windows ab, könnte evtl nicht nötig sein
 	}
 
 	//Aufräumen
-	destroy_image(imag);
-	strcpy((char*)sendBuffer, "EXIT");
-	sendPacket(hDevice, sendBuffer, sizeof("EXIT")-1);
-	CloseHandle(hDevice);
-	close_window();
+	destroyPage(main_page);
+//	strcpy((char*)sendBuffer, "EXIT");
+//	sendPacket(hDevice, sendBuffer, sizeof("EXIT")-1);
+//	CloseHandle(hDevice);
 	return 0;
 }
 
 LRESULT CALLBACK window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 	switch(uMsg){
-	case WM_DESTROY: {
-		running = false;
+	case WM_DESTROY:{
+		ErrCheck(setWindowState(hwnd, WINDOW_SHOULD_CLOSE), "set close window state");
 		break;
 	}
 	case WM_SIZE:{
-		window_width = LOWORD(lParam);
-		window_height = HIWORD(lParam);
-		buffer_width = window_width/pixel_size;
-		buffer_height = window_height/pixel_size;
-        delete[] memory;
-        memory = new uint[buffer_width*buffer_height];
+		//TODO Fenster skalieren
         break;
 	}
 	case WM_LBUTTONDOWN:{
@@ -122,10 +108,73 @@ LRESULT CALLBACK window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 		break;
 	}
 	case WM_MOUSEMOVE:{
-		mouse.pos.x = GET_X_LPARAM(lParam)/pixel_size;
-		mouse.pos.y = GET_Y_LPARAM(lParam)/pixel_size;
+		for(WORD i=0; i < app.window_count; ++i){
+			if(app.windows[i] == hwnd){
+				mouse.pos.x = GET_X_LPARAM(lParam)/app.info[i].pixel_size;
+				mouse.pos.y = GET_Y_LPARAM(lParam)/app.info[i].pixel_size;
+			}
+		}
 		break;
 	}
 	}
 	return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
+
+ErrCode loadStartPage(){
+	destroyPage(main_page);
+	Menu* main = new Menu;
+	main_page.menus[0] = main;
+	main_page.menu_count = 1;
+
+	ivec2 pos = {100, 200};
+	ivec2 size = {160, 40};
+	main_page.menus[0]->buttons[0].pos = {pos.x, pos.y};
+	main_page.menus[0]->buttons[0].size = {size.x, size.y};
+	main_page.menus[0]->buttons[0].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
+	main_page.menus[0]->buttons[0].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
+	main_page.menus[0]->buttons[0].event = &loadFreeTrainingPage;
+	Image* buttonImage = new Image;
+	ErrCheck(loadImage("textures/button.tex", *buttonImage), "button texture laden");
+	main_page.images[0] = buttonImage;
+	main_page.image_count = 1;
+	main_page.menus[0]->buttons[0].text = "START";
+	main_page.menus[0]->buttons[0].image = buttonImage;
+	main_page.menus[0]->button_count = 1;
+
+	main_page.code = _default_page_function;
+
+	return SUCCESS;
+}
+
+ErrCode loadFreeTrainingPage(){
+	destroyPage(main_page);
+	Menu* main = new Menu;
+	main_page.menus[0] = main;
+	main_page.menu_count = 1;
+
+	ivec2 pos = {50, 350};
+	ivec2 size = {160, 40};
+	main_page.menus[0]->buttons[0].pos = {pos.x, pos.y};
+	main_page.menus[0]->buttons[0].size = {size.x, size.y};
+	main_page.menus[0]->buttons[0].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
+	main_page.menus[0]->buttons[0].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
+	main_page.menus[0]->buttons[0].event = &loadStartPage;
+	Image* buttonImage = new Image;
+	ErrCheck(loadImage("textures/button.tex", *buttonImage), "button texture laden");
+	main_page.images[0] = buttonImage;
+	main_page.image_count = 1;
+	main_page.menus[0]->buttons[0].text = "BEENDEN";
+	main_page.menus[0]->buttons[0].image = buttonImage;
+	main_page.menus[0]->button_count = 1;
+
+	main_page.menus[0]->labels[0].pos = {20, 20};
+	main_page.menus[0]->labels[0].text_size = 4;
+	main_page.menus[0]->labels[1].pos = {20, 80};
+	main_page.menus[0]->labels[1].text_size = 4;
+	main_page.menus[0]->labels[1].text = "test";
+	main_page.menus[0]->label_count = 2;
+
+	main_page.code = displayDataPage;
+
+	return SUCCESS;
 }
