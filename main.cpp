@@ -9,9 +9,13 @@ extern "C"{
 #include "usb.h"
 #include "pages.h"
 
+#define NO_DEVICE
+
 LRESULT CALLBACK basic_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-//HANDLE hDevice = open_device("\\\\.\\COM6", 19200);
+#ifndef NO_DEVICE
+HANDLE hDevice = open_device("\\\\.\\COM6", 19200);
+#endif
 BYTE receiveBuffer[128];
 BYTE sendBuffer[128];
 Page main_page;
@@ -56,8 +60,9 @@ void displayDataPage(){
 INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){
 	HWND main_window;
 	ErrCheck(openWindow(hInstance, 800, 800, 2, main_window, "waterrower", basic_window_callback), "open main window");
-
-//	init_communication(hDevice, sendBuffer, receiveBuffer);
+#ifndef NO_DEVICE
+	init_communication(hDevice, sendBuffer, receiveBuffer);
+#endif
 	ErrCheck(loadStartPage(), "laden des Startbildschirms");
 
 	while(app.window_count){
@@ -68,21 +73,25 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 		ErrCheck(drawWindow(main_window), "draw window");
 
-//		refreshData();
-//		transmitRequests(hDevice);
+#ifndef NO_DEVICE
+		refreshData();
+		transmitRequests(hDevice);
 
-//		int length = readPacket(hDevice, receiveBuffer, 128);
-//		if(length > 0){
-//			checkCode(receiveBuffer, length);
-//		}
+		int length = readPacket(hDevice, receiveBuffer, 128);
+		if(length > 0){
+			checkCode(receiveBuffer, length);
+		}
+#endif
 		getMessages();	//TODO frägt alle windows ab, könnte evtl nicht nötig sein
 	}
 
 	//Aufräumen
 	destroyPage(main_page);
 	strcpy((char*)sendBuffer, "EXIT");
-//	sendPacket(hDevice, sendBuffer, sizeof("EXIT")-1);
-//	CloseHandle(hDevice);
+#ifndef NO_DEVICE
+	sendPacket(hDevice, sendBuffer, sizeof("EXIT")-1);
+	CloseHandle(hDevice);
+#endif
 	return 0;
 }
 
@@ -100,7 +109,7 @@ LRESULT CALLBACK basic_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPAR
 	}
 	case WM_LBUTTONDOWN:{
 		if(!getButton(mouse, MOUSE_LMB)){
-
+			ErrCheck(addRequest(5));
 		};
 		setButton(mouse, MOUSE_LMB);
 		break;
@@ -171,8 +180,10 @@ ErrCode switchToStartPage(){
 
 	main_page.code = _default_page_function;
 
-//	strcpy((char*)sendBuffer, "RESET");
-//	sendPacket(hDevice, sendBuffer, sizeof("RESET")-1);
+#ifndef NO_DEVICE
+	strcpy((char*)sendBuffer, "RESET");
+	sendPacket(hDevice, sendBuffer, sizeof("RESET")-1);
+#endif
 
 	return SUCCESS;
 }
