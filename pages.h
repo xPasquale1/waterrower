@@ -14,6 +14,20 @@ struct Page{
 	void (*code)(void) = _default_page_function;
 };
 
+//Löscht die font nicht!
+void destroyPageNoFont(Page& page){
+	for(WORD i=0; i < page.menu_count; ++i){
+		delete page.menus[i];
+	}
+	for(WORD i=0; i < page.image_count; ++i){
+		destroyImage(*page.images[i]);
+		delete page.images[i];
+	}
+	page.menu_count = 0;
+	page.image_count = 0;
+}
+
+//Löscht die gespeicherte Font mit!
 void destroyPage(Page& page){
 	for(WORD i=0; i < page.menu_count; ++i){
 		delete page.menus[i];

@@ -9,7 +9,7 @@ extern "C"{
 #include "usb.h"
 #include "pages.h"
 
-//#define NO_DEVICE
+#define NO_DEVICE
 
 LRESULT CALLBACK basic_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -20,8 +20,8 @@ BYTE receiveBuffer[128];
 BYTE sendBuffer[128];
 Page main_page;
 BYTE page_switch = 0;	//0 kein wechsel, 1 wechsel zur startseite, 2 free training seite
+Font* default_font = nullptr;
 
-//Intervall in Millisekunden, sollte nicht < 26 sein
 ErrCode loadStartPage(){page_switch = 1; return SUCCESS;};
 ErrCode loadFreeTrainingPage(){page_switch = 2; return SUCCESS;};
 ErrCode switchToStartPage();
@@ -54,10 +54,12 @@ void refreshData(WORD interval=250){
 }
 
 void displayDataPage(){
+#ifndef NO_DEVICE
 	refreshData(250);
+#endif
 	main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist) + 'm';
 	main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + std::to_string(rowingData.ms_total) + "m/s";
-	main_page.menus[0]->labels[2].text = "Durchschnitt: " + std::to_string(rowingData.ms_avg) + "m/s";
+	main_page.menus[0]->labels[2].text = "Durchschnittlich: " + std::to_string(rowingData.ms_avg) + "m/s";
 	main_page.menus[0]->labels[3].text = "Zeit: " + std::to_string(rowingData.hrs) + ':' + std::to_string(rowingData.min) + ':' + std::to_string(rowingData.sec);
 }
 
@@ -67,6 +69,11 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 #ifndef NO_DEVICE
 	init_communication(hDevice, sendBuffer, receiveBuffer);
 #endif
+	default_font = new Font;
+	ErrCheck(loadFont("fonts/ascii.tex", *default_font, {82, 83}), "font laden");
+	default_font->font_size = 31;
+	main_page.font = default_font;
+
 	ErrCheck(loadStartPage(), "laden des Startbildschirms");
 
 	while(app.window_count){
@@ -89,7 +96,8 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	}
 
 	//Aufräumen
-	destroyPage(main_page);
+	destroyPageNoFont(main_page);
+	destroyFont(default_font);
 	strcpy((char*)sendBuffer, "EXIT");
 #ifndef NO_DEVICE
 	sendPacket(hDevice, sendBuffer, sizeof("EXIT")-1);
@@ -160,7 +168,7 @@ ErrCode switchPage(){
 }
 
 ErrCode switchToStartPage(){
-	destroyPage(main_page);
+	destroyPageNoFont(main_page);
 
 	Image* buttonImage = new Image;
 	ErrCheck(loadImage("textures/button.tex", *buttonImage), "button texture laden");
@@ -192,7 +200,7 @@ ErrCode switchToStartPage(){
 }
 
 ErrCode switchToFreeTrainingPage(){
-	destroyPage(main_page);
+	destroyPageNoFont(main_page);
 
 	Image* buttonImage = new Image;
 	ErrCheck(loadImage("textures/button.tex", *buttonImage), "button texture laden");
@@ -210,12 +218,6 @@ ErrCode switchToFreeTrainingPage(){
 	menu1->buttons[0].text = "BEENDEN";
 	menu1->buttons[0].image = buttonImage;
 	menu1->button_count = 1;
-
-	Font* font = new Font;
-	font->char_size = {82, 83};
-	font->font_size = 31;
-	ErrCheck(loadFont("fonts/ascii.tex", *font, font->char_size), "font laden");
-	main_page.font = font;
 
 	menu1->labels[0].pos = {20, 20};
 	menu1->labels[0].text_size = 4;

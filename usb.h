@@ -272,11 +272,16 @@ int checkCode(BYTE* receiveBuffer, int length){
 		for(int i=0; i < 6; ++i){
 			value[i] = receiveBuffer[i+6];
 		}
-		BYTE location[3];	//TODO naja das könnte ja eigentlich alles sein, daher noch den Speicherbereich checken wie unten
+		BYTE location[3];
 		for(int i=0; i < 3; ++i){
 			location[i] = receiveBuffer[i+3];
 		}
-		rowingData.dist = strtol((char*)value, 0, 16);
+		switch(codeToInt((char*)location)){
+		case codeToInt("057"):{
+			rowingData.dist = strtol((char*)value, 0, 16);
+			break;
+		}
+		}
 		print_packet(receiveBuffer, length);
 		break;
 	}

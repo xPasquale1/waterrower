@@ -4,7 +4,6 @@
 #include <windowsx.h>
 #include <fstream>
 
-#include "fonts/5x5font.h"
 #include "util.h"
 
 enum WINDOWSTATE{
@@ -358,6 +357,7 @@ struct Font{
 
 ErrCode loadFont(const char* path, Font& font, ivec2 char_size){
 	ErrCode code;
+	font.char_size = char_size;
 	if((code = ErrCheck(loadImage(path, font.image), "font image laden")) != SUCCESS){
 		return code;
 	}
@@ -372,8 +372,7 @@ ErrCode loadFont(const char* path, Font& font, ivec2 char_size){
 				}
 			}
 		}
-		//TODO +10 ???
-		font.char_sizes[i] = x_max - (i%16)*char_size.x + 10;
+		font.char_sizes[i] = x_max - (i%16)*char_size.x + 8;
 	}
 	return SUCCESS;
 }
@@ -405,51 +404,10 @@ uint drawFontChar(HWND window, Font& font, char symbol, uint start_x, uint start
 	return 0;
 }
 
-//Geht nur von 0-9!!!
-//TODO alle Funktionen hier sind nur auf die 5x5 font abgestimmt, sollte man verallgemeinern
-inline void draw_number(HWND window, uint x, uint y, uint size, BYTE number, uint color){
-	short idx = (number+48)*5;
-	for(uint i=0; i < 5; ++i){
-		for(uint j=0; j < 5; ++j){
-			if((font5x5[idx]<<j)&0b10000) drawRectangle(window, x+j*size, y+i*size, size, size, color);
-		}
-		++idx;
-	}
-}
-
-static int _rec_offset;
-int _number_recurse(HWND window, uint x, uint y, uint size, int num, uint color, int iter){
-	if(num > 0){
-		++_rec_offset;
-		_number_recurse(window, x, y, size, num/10, color, iter+1);
-		draw_number(window, x+(_rec_offset-iter-1)*5*size, y, size, num%10, color);
-	}
-	return _rec_offset;
-}
-
-void drawCharacter(HWND window, uint x, uint y, uint size, BYTE character, uint color){
-	short idx = character*5;
-	for(uint i=0; i < 5; ++i){
-		for(uint j=0; j < 5; ++j){
-			if((font5x5[idx]<<j)&0b10000) drawRectangle(window, x+j*size, y+i*size, size, size, color);
-		}
-		++idx;
-	}
-}
-
-//Gibt die Anzahl der gezeichneten Zeichen zurück
-int drawInt(HWND window, uint x, uint y, uint size, int num, uint color){
-	if(num == 0){
-		draw_number(window, x, y, size, 0, color);
-		return 1;
-	}
-	_rec_offset = 0;
-	if(num < 0){
-		_rec_offset = 1;
-		num *= -1;
-		drawCharacter(window, x, y, size, '-', color);
-	}
-	return _number_recurse(window, x, y, size, num, color, 0);
+//Zerstört eine im Heap allokierte Font und alle weiteren allokierten Elemente
+void destroyFont(Font* font){
+	destroyImage(font->image);
+	delete font;
 }
 
 ErrCode _defaultEvent(void){return SUCCESS;}
@@ -469,7 +427,7 @@ struct Button{
 	uint color = RGBA(120, 120, 120);
 	uint hover_color = RGBA(120, 120, 255);
 	uint textcolor = RGBA(180, 180, 180);
-	uint textsize=2;
+	uint textsize = 24;
 };
 
 inline constexpr bool checkButtonState(Button& button, BUTTONSTATE state){return (button.state&state);}
@@ -492,7 +450,7 @@ inline void buttonsClicked(Button* buttons, WORD button_count){
 	}
 }
 
-inline void drawButtons(HWND window, Button* buttons, WORD button_count){
+inline void drawButtons(HWND window, Font& font, Button* buttons, WORD button_count){
 	for(WORD i=0; i < button_count; ++i){
 		Button& b = buttons[i];
 		if(!checkButtonState(b, BUTTON_VISIBLE)) continue;
@@ -507,22 +465,29 @@ inline void drawButtons(HWND window, Button* buttons, WORD button_count){
 			}else
 				copyImageToWindow(window, *b.image, b.pos.x, b.pos.y, b.pos.x+b.size.x, b.pos.y+b.size.y);
 		}
-		if(checkButtonState(b, BUTTON_TEXT_CENTER)){
-			int x_offset = b.size.x/2-((b.text.size())*10+b.text.size()-1+1)/2;
-			for(size_t i=0; i < b.text.size(); ++i){
-				drawCharacter(window, x_offset+b.pos.x+i*10+i+1, b.pos.y+b.size.y/2-b.textsize*5/2, 2, b.text[i], b.textcolor);
+		if(checkButtonState(b, BUTTON_TEXT_CENTER)){	//TODO fix
+			uint offset = 0;
+			int tmp_font_size = font.font_size;
+			font.font_size = b.textsize;
+			for(size_t i=0; i < b.text.size(); ++i){	//+10 ist nur temporär als fix von oben
+				offset += drawFontChar(window, font, b.text[i], b.pos.x+offset+10, b.pos.y+b.size.y/2-b.textsize/2);
 			}
+			font.font_size = tmp_font_size;
 		}else{
-			for(size_t i=0; i < b.text.size(); ++i){
-				drawCharacter(window, b.pos.x+i*10+i+1, b.pos.y+b.size.y/2-b.textsize*5/2, 2, b.text[i], b.textcolor);
+			uint offset = 0;
+			int tmp_font_size = font.font_size;
+			font.font_size = b.textsize;
+			for(size_t i=0; i < b.text.size(); ++i){	//+10 ist nur temporär als fix von oben
+				offset += drawFontChar(window, font, b.text[i], b.pos.x+offset+10, b.pos.y+b.size.y/2-b.textsize/2);
 			}
+			font.font_size = tmp_font_size;
 		}
 	}
 }
 
-inline void updateButtons(HWND window, Button* buttons, WORD button_count){
+inline void updateButtons(HWND window, Font& font, Button* buttons, WORD button_count){
 	buttonsClicked(buttons, button_count);
-	drawButtons(window, buttons, button_count);
+	drawButtons(window, font, buttons, button_count);
 }
 
 enum MENUSTATE{
@@ -550,7 +515,7 @@ struct Menu{
 inline constexpr bool checkMenuState(Menu& menu, MENUSTATE state){return (menu.state&state);}
 inline void updateMenu(HWND window, Menu& menu, Font& font){
 	if(checkMenuState(menu, MENU_OPEN)){
-		updateButtons(window, menu.buttons, menu.button_count);
+		updateButtons(window, font, menu.buttons, menu.button_count);
 		for(WORD i=0; i < menu.label_count; ++i){
 			Label& label = menu.labels[i];
 			uint offset = 0;
