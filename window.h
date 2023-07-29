@@ -8,19 +8,21 @@
 #include "util.h"
 
 enum WINDOWSTATE{
-	WINDOW_SHOULD_CLOSE = 1
+	WINDOW_SHOULD_CLOSE = 1,
+	WINDOW_RESIZE = 2
 };
 struct WindowInfo{
 	WORD window_width = 800;
 	WORD window_height = 800;
 	WORD pixel_size = 1;
-	BYTE state = 0;				//Bit 0: wurde geschlossen
+	BYTE state = 0;	//WINDOWSTATE für mehr Informationen
+	WORD data[3];	//Zusätzliche Daten bei state changes können hier gespeichert werden
 };
 #define MAX_WINDOW_COUNT 20
 struct Application{
 	HWND windows[MAX_WINDOW_COUNT];		//Fenster handles der app
 	WindowInfo info[MAX_WINDOW_COUNT];	//Fensterinfos
-	uint* pixels[MAX_WINDOW_COUNT];		//Zugehörige pixeldaten der Fenster
+	uint* pixels[MAX_WINDOW_COUNT];		//Zugehörige Pixeldaten der Fenster
 	WORD window_count = 0;				//Anzahl der Fenster
 	BITMAPINFO bitmapInfo = {};			//TODO eigentlich ist das für jedes Fenster gleich, von daher braucht man kein array
 }; static Application app;
@@ -34,6 +36,7 @@ inline ErrCode setWindowState(HWND window, WINDOWSTATE state){
 	}
 	return WINDOW_NOT_FOUND;
 }
+
 inline ErrCode resetWindowState(HWND window, WINDOWSTATE state){
 	for(WORD i=0; i < app.window_count; ++i){
 		if(app.windows[i] == window){
@@ -43,6 +46,7 @@ inline ErrCode resetWindowState(HWND window, WINDOWSTATE state){
 	}
 	return WINDOW_NOT_FOUND;
 }
+
 //TODO schlecht gelöst, sollte auch Fehlercodes zurückgeben
 inline bool getWindowState(HWND window, WINDOWSTATE state){
 	for(WORD i=0; i < app.window_count; ++i){
@@ -54,16 +58,81 @@ inline bool getWindowState(HWND window, WINDOWSTATE state){
 	return true;
 }
 
-LRESULT CALLBACK window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+inline ErrCode getWindow(HWND window, WORD& index){
+	for(WORD i=0; i < app.window_count; ++i){
+		if(app.windows[i] == window){
+			index = i;
+			return SUCCESS;
+		}
+	}
+	return WINDOW_NOT_FOUND;
+}
+
+inline ErrCode resizeWindow(HWND window, WORD width, WORD height, WORD pixel_size){
+	for(WORD i=0; i < app.window_count; ++i){
+		if(app.windows[i] == window){
+			delete[] app.pixels[i];
+			app.info[i].window_width = width;
+			app.info[i].window_height = height;
+			app.info[i].pixel_size = pixel_size;
+			app.pixels[i] = new uint[width/pixel_size*height/pixel_size];
+			return SUCCESS;
+		}
+	}
+	return WINDOW_NOT_FOUND;
+}
+
+typedef LRESULT (*window_callback_function)(HWND, UINT, WPARAM, LPARAM);
+
+LRESULT CALLBACK default_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
+	switch(uMsg){
+	case WM_DESTROY:{
+		ErrCheck(setWindowState(hwnd, WINDOW_SHOULD_CLOSE), "set close window state");
+		break;
+	}
+	case WM_SIZE:{
+		UINT width = LOWORD(lParam);
+		UINT height = HIWORD(lParam);
+		ErrCheck(resizeWindow(hwnd, width, height, 2));
+        break;
+	}
+	case WM_LBUTTONDOWN:{
+		setButton(mouse, MOUSE_LMB);
+		break;
+	}
+	case WM_LBUTTONUP:{
+		resetButton(mouse, MOUSE_LMB);
+		break;
+	}
+	case WM_RBUTTONDOWN:{
+		setButton(mouse, MOUSE_RMB);
+		break;
+	}
+	case WM_RBUTTONUP:{
+		resetButton(mouse, MOUSE_RMB);
+		break;
+	}
+	case WM_MOUSEMOVE:{
+		for(WORD i=0; i < app.window_count; ++i){
+			if(app.windows[i] == hwnd){
+				mouse.pos.x = GET_X_LPARAM(lParam)/app.info[i].pixel_size;
+				mouse.pos.y = GET_Y_LPARAM(lParam)/app.info[i].pixel_size;
+			}
+		}
+		break;
+	}
+	}
+	return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
 
 //Setzt bei Erfolg den Parameter window zu einem gültigen window handle, auf welches man das zugreifen kann
-ErrCode openWindow(HINSTANCE hInstance, LONG window_width, LONG window_height, WORD pixel_size, HWND& window, const char* name = "Window"){
+ErrCode openWindow(HINSTANCE hInstance, LONG window_width, LONG window_height, WORD pixel_size, HWND& window, const char* name = "Window", window_callback_function callback = default_window_callback){
 	//Erstelle Fenster Klasse
 	if(app.window_count >= MAX_WINDOW_COUNT) return TOO_MANY_WINDOWS;
 	WNDCLASS window_class = {};
 	window_class.style = CS_HREDRAW | CS_VREDRAW;
 	window_class.lpszClassName = "Window-Class";
-	window_class.lpfnWndProc = window_callback;
+	window_class.lpfnWndProc = callback;
 
 	//Registriere Fenster Klasse
 	RegisterClass(&window_class);
@@ -117,6 +186,17 @@ inline void getMessages()noexcept{
 	for(WORD i=0; i < app.window_count; ++i){
 		if(getWindowState(app.windows[i], WINDOW_SHOULD_CLOSE)){
 			closeWindow(app.windows[i]);
+			break;
+		}
+		if(getWindowState(app.windows[i], WINDOW_RESIZE)){
+			std::cout << "resize" << std::endl;
+			WORD new_width = app.info[i].data[0];
+			WORD new_height = app.info[i].data[1];
+			app.info[i].window_width = new_width;
+			app.info[i].window_height = new_height;
+			delete[] app.pixels[i];
+			app.pixels[i] = new uint[new_width/app.info[i].pixel_size*new_height/app.info[i].pixel_size];
+			resetWindowState(app.windows[i], WINDOW_RESIZE);
 			break;
 		}
 		while(PeekMessage(&msg, app.windows[i], 0, 0, PM_REMOVE)){
@@ -217,7 +297,7 @@ inline void draw_number(HWND window, uint x, uint y, uint size, BYTE number, uin
 	}
 }
 
-static int _rec_offset = 0;
+static int _rec_offset;
 int _number_recurse(HWND window, uint x, uint y, uint size, int num, uint color, int iter){
 	if(num > 0){
 		++_rec_offset;
@@ -321,7 +401,7 @@ enum BUTTONSTATE{
 };
 struct Button{
 	~Button(){}
-	ErrCode (*event)(void) = &_defaultEvent;	//Funktionspointer zu einer Funktion die gecallt werden soll wenn der Button gedrückt wird
+	ErrCode (*event)(void) = _defaultEvent;	//Funktionspointer zu einer Funktion die gecallt werden soll wenn der Button gedrückt wird
 	std::string text;
 	Image* image = nullptr;
 	ivec2 pos = {0, 0};
@@ -334,10 +414,11 @@ struct Button{
 	uint textcolor = RGBA(180, 180, 180);
 	uint textsize=2;
 };
+
 inline constexpr bool checkButtonState(Button& button, BUTTONSTATE state){return (button.state&state);}
 //TODO kann bestimmt besser geschrieben werden...
-inline void buttonsClicked(Button* buttons, uint button_count, Mouse& mouse){
-	for(uint i=0; i < button_count; ++i){
+inline void buttonsClicked(Button* buttons, WORD button_count){
+	for(WORD i=0; i < button_count; ++i){
 		Button& b = buttons[i];
 		if(!checkButtonState(b, BUTTON_VISIBLE)) continue;
 		ivec2 delta = {mouse.pos.x - b.pos.x, mouse.pos.y - b.pos.y};
@@ -354,8 +435,8 @@ inline void buttonsClicked(Button* buttons, uint button_count, Mouse& mouse){
 	}
 }
 
-inline void drawButtons(HWND window, Button* buttons, uint button_count){
-	for(uint i=0; i < button_count; ++i){
+inline void drawButtons(HWND window, Button* buttons, WORD button_count){
+	for(WORD i=0; i < button_count; ++i){
 		Button& b = buttons[i];
 		if(!checkButtonState(b, BUTTON_VISIBLE)) continue;
 		if(b.image == nullptr){
@@ -382,8 +463,8 @@ inline void drawButtons(HWND window, Button* buttons, uint button_count){
 	}
 }
 
-inline void updateButtons(HWND window, Button* buttons, uint button_count, Mouse& mouse){
-	buttonsClicked(buttons, button_count, mouse);
+inline void updateButtons(HWND window, Button* buttons, WORD button_count){
+	buttonsClicked(buttons, button_count);
 	drawButtons(window, buttons, button_count);
 }
 
@@ -391,7 +472,7 @@ enum MENUSTATE{
 	MENU_OPEN=1, MENU_OPEN_TOGGLE=2
 };
 #define MAX_BUTTONS 10
-#define MAX_STRINGS 30
+#define MAX_STRINGS 20
 //Speichert und zeigt x Buttons und strings an
 struct Label{
 	std::string text;
@@ -399,22 +480,24 @@ struct Label{
 	uint textcolor = RGBA(180, 180, 180);
 	WORD text_size = 2;
 };
+
 struct Menu{
 	Button buttons[MAX_BUTTONS];
-	WORD button_count=0;
+	WORD button_count = 0;
 	BYTE state = MENU_OPEN;	//Bits: offen, toggle bit für offen, Rest ungenutzt
 	ivec2 pos = {};			//TODO Position in Bildschirmpixelkoordinaten, buttons bekommen zusätzlich diesen offset
 	Label labels[MAX_STRINGS];
 	WORD label_count = 0;
 };
+
 inline constexpr bool checkMenuState(Menu& menu, MENUSTATE state){return (menu.state&state);}
-inline void updateMenu(HWND window, Menu& menu, Mouse& mouse){
+inline void updateMenu(HWND window, Menu& menu){
 	if(checkMenuState(menu, MENU_OPEN)){
-		updateButtons(window, menu.buttons, menu.button_count, mouse);
+		updateButtons(window, menu.buttons, menu.button_count);
 		for(WORD i=0; i < menu.label_count; ++i){
 			Label& label = menu.labels[i];
 			for(size_t j=0; j < label.text.size(); ++j){
-				drawCharacter(window, label.pos.x+label.text_size*5*j, label.pos.y, label.text_size, label.text[j], label.textcolor);
+				drawCharacter(window, label.pos.x+label.text_size*5*j+j, label.pos.y, label.text_size, label.text[j], label.textcolor);
 			}
 		}
 	}

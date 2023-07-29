@@ -3,7 +3,7 @@
 #include "usb.h"
 
 void _default_page_function(void){}
-#define MAX_MENUS 5
+#define MAX_MENUS 2
 #define MAX_IMAGES 5
 struct Page{
 	Menu* menus[MAX_MENUS];
@@ -26,7 +26,7 @@ void destroyPage(Page& page){
 
 void updatePage(Page& page, HWND window){
 	for(WORD i=0; i < page.menu_count; ++i){
-		updateMenu(window, *page.menus[i], mouse);
+		updateMenu(window, *(page.menus[i]));
 	}
 	page.code();
 }

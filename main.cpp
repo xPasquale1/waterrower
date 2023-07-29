@@ -9,15 +9,21 @@ extern "C"{
 #include "usb.h"
 #include "pages.h"
 
-//HANDLE hDevice = open_device("\\\\.\\COM6", 19200);
+LRESULT CALLBACK basic_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
+HANDLE hDevice = open_device("\\\\.\\COM6", 19200);
 BYTE receiveBuffer[128];
 BYTE sendBuffer[128];
 Page main_page;
+BYTE page_switch = 0;	//0 kein wechsel, 1 wechsel zur startseite, 2 free training seite
 
 SYSTEMTIME last_request_tp2 = {};
 //Intervall in Millisekunden, sollte nicht < 26 sein
-ErrCode loadStartPage();
-ErrCode loadFreeTrainingPage();
+ErrCode loadStartPage(){page_switch = 1; return SUCCESS;};
+ErrCode loadFreeTrainingPage(){page_switch = 2; return SUCCESS;};
+ErrCode switchToStartPage();
+ErrCode switchToFreeTrainingPage();
+ErrCode switchPage();
 void refreshData(WORD interval=250){
 	SYSTEMTIME systemTime;
 	GetSystemTime(&systemTime);
@@ -45,44 +51,47 @@ void displayDataPage(){
 
 INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){
 	HWND main_window;
-	ErrCheck(openWindow(hInstance, 800, 800, 2, main_window), "open main window");
+	ErrCheck(openWindow(hInstance, 800, 800, 2, main_window, "waterrower", basic_window_callback), "open main window");
 
-//	init_communication(hDevice, sendBuffer, receiveBuffer);
+	init_communication(hDevice, sendBuffer, receiveBuffer);
 	ErrCheck(loadStartPage(), "laden des Startbildschirms");
 
 	while(app.window_count){
 		ErrCheck(clearWindow(main_window), "clear window");
 
 		updatePage(main_page, main_window);
+		switchPage();
 
 		ErrCheck(drawWindow(main_window), "draw window");
 
-//		refreshData();
-//		transmitRequests(hDevice);
+		refreshData();
+		transmitRequests(hDevice);
 
-//		int length = readPacket(hDevice, receiveBuffer, 128);
-//		if(length > 0){
-//			checkCode(receiveBuffer, length);
-//		}
+		int length = readPacket(hDevice, receiveBuffer, 128);
+		if(length > 0){
+			checkCode(receiveBuffer, length);
+		}
 		getMessages();	//TODO frägt alle windows ab, könnte evtl nicht nötig sein
 	}
 
 	//Aufräumen
 	destroyPage(main_page);
-//	strcpy((char*)sendBuffer, "EXIT");
-//	sendPacket(hDevice, sendBuffer, sizeof("EXIT")-1);
-//	CloseHandle(hDevice);
+	strcpy((char*)sendBuffer, "EXIT");
+	sendPacket(hDevice, sendBuffer, sizeof("EXIT")-1);
+	CloseHandle(hDevice);
 	return 0;
 }
 
-LRESULT CALLBACK window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
+LRESULT CALLBACK basic_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 	switch(uMsg){
 	case WM_DESTROY:{
 		ErrCheck(setWindowState(hwnd, WINDOW_SHOULD_CLOSE), "set close window state");
 		break;
 	}
 	case WM_SIZE:{
-		//TODO Fenster skalieren
+		UINT width = LOWORD(lParam);
+		UINT height = HIWORD(lParam);
+		ErrCheck(resizeWindow(hwnd, width, height, 2));
         break;
 	}
 	case WM_LBUTTONDOWN:{
@@ -120,59 +129,79 @@ LRESULT CALLBACK window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 	return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-ErrCode loadStartPage(){
-	destroyPage(main_page);
-	Menu* main = new Menu;
-	main_page.menus[0] = main;
-	main_page.menu_count = 1;
+ErrCode switchPage(){
+	switch(page_switch){
+	case 1:
+		switchToStartPage();
+		page_switch = 0;
+		break;
+	case 2:
+		switchToFreeTrainingPage();
+		page_switch = 0;
+		break;
+	}
+	return SUCCESS;
+}
 
-	ivec2 pos = {100, 200};
-	ivec2 size = {160, 40};
-	main_page.menus[0]->buttons[0].pos = {pos.x, pos.y};
-	main_page.menus[0]->buttons[0].size = {size.x, size.y};
-	main_page.menus[0]->buttons[0].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
-	main_page.menus[0]->buttons[0].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
-	main_page.menus[0]->buttons[0].event = &loadFreeTrainingPage;
+ErrCode switchToStartPage(){
+	destroyPage(main_page);
+
 	Image* buttonImage = new Image;
 	ErrCheck(loadImage("textures/button.tex", *buttonImage), "button texture laden");
 	main_page.images[0] = buttonImage;
 	main_page.image_count = 1;
-	main_page.menus[0]->buttons[0].text = "START";
-	main_page.menus[0]->buttons[0].image = buttonImage;
-	main_page.menus[0]->button_count = 1;
+
+	Menu* menu1 = new Menu;
+	ivec2 pos = {100, 200};
+	ivec2 size = {160, 40};
+	menu1->buttons[0].pos = {pos.x, pos.y};
+	menu1->buttons[0].size = {size.x, size.y};
+	menu1->buttons[0].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
+	menu1->buttons[0].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
+	menu1->buttons[0].event = loadFreeTrainingPage;
+	menu1->buttons[0].text = "START";
+	menu1->buttons[0].image = buttonImage;
+	menu1->button_count = 1;
+
+	main_page.menus[0] = menu1;
+	main_page.menu_count = 1;
 
 	main_page.code = _default_page_function;
+
+	strcpy((char*)sendBuffer, "RESET");
+	sendPacket(hDevice, sendBuffer, sizeof("RESET")-1);
 
 	return SUCCESS;
 }
 
-ErrCode loadFreeTrainingPage(){
+ErrCode switchToFreeTrainingPage(){
 	destroyPage(main_page);
-	Menu* main = new Menu;
-	main_page.menus[0] = main;
-	main_page.menu_count = 1;
 
-	ivec2 pos = {50, 350};
-	ivec2 size = {160, 40};
-	main_page.menus[0]->buttons[0].pos = {pos.x, pos.y};
-	main_page.menus[0]->buttons[0].size = {size.x, size.y};
-	main_page.menus[0]->buttons[0].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
-	main_page.menus[0]->buttons[0].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
-	main_page.menus[0]->buttons[0].event = &loadStartPage;
 	Image* buttonImage = new Image;
 	ErrCheck(loadImage("textures/button.tex", *buttonImage), "button texture laden");
 	main_page.images[0] = buttonImage;
 	main_page.image_count = 1;
-	main_page.menus[0]->buttons[0].text = "BEENDEN";
-	main_page.menus[0]->buttons[0].image = buttonImage;
-	main_page.menus[0]->button_count = 1;
 
-	main_page.menus[0]->labels[0].pos = {20, 20};
-	main_page.menus[0]->labels[0].text_size = 4;
-	main_page.menus[0]->labels[1].pos = {20, 80};
-	main_page.menus[0]->labels[1].text_size = 4;
-	main_page.menus[0]->labels[1].text = "test";
-	main_page.menus[0]->label_count = 2;
+	Menu* menu1 = new Menu;
+	ivec2 pos = {50, 350};
+	ivec2 size = {160, 40};
+	menu1->buttons[0].pos = {pos.x, pos.y};
+	menu1->buttons[0].size = {size.x, size.y};
+	menu1->buttons[0].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
+	menu1->buttons[0].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
+	menu1->buttons[0].event = loadStartPage;
+	menu1->buttons[0].text = "BEENDEN";
+	menu1->buttons[0].image = buttonImage;
+	menu1->button_count = 1;
+
+	menu1->labels[0].pos = {20, 20};
+	menu1->labels[0].text_size = 4;
+	menu1->labels[1].pos = {20, 80};
+	menu1->labels[1].text_size = 4;
+	menu1->label_count = 2;
+
+	main_page.menus[0] = menu1;
+	main_page.menu_count = 1;
 
 	main_page.code = displayDataPage;
 
