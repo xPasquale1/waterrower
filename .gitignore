@@ -1,3 +1,4 @@
 
 Debug/waterrower.exe
 *.o
+/Debug/
