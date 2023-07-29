@@ -237,6 +237,7 @@ inline void clearWindows()noexcept{
 }
 
 inline constexpr uint RGBA(BYTE r, BYTE g, BYTE b, BYTE a=255){return uint(b|g<<8|r<<16|a<<24);}
+inline constexpr BYTE A(uint color){return BYTE(color>>24);}
 inline constexpr BYTE R(uint color){return BYTE(color>>16);}
 inline constexpr BYTE G(uint color){return BYTE(color>>8);}
 inline constexpr BYTE B(uint color){return BYTE(color);}
@@ -283,53 +284,6 @@ inline ErrCode drawRectangle(HWND window, uint x, uint y, uint dx, uint dy, uint
 		}
 	}
 	return WINDOW_NOT_FOUND;
-}
-
-//Geht nur von 0-9!!!
-//TODO alle Funktionen hier sind nur auf die 5x5 font abgestimmt, sollte man verallgemeinern
-inline void draw_number(HWND window, uint x, uint y, uint size, BYTE number, uint color){
-	short idx = (number+48)*5;
-	for(uint i=0; i < 5; ++i){
-		for(uint j=0; j < 5; ++j){
-			if((font5x5[idx]<<j)&0b10000) drawRectangle(window, x+j*size, y+i*size, size, size, color);
-		}
-		++idx;
-	}
-}
-
-static int _rec_offset;
-int _number_recurse(HWND window, uint x, uint y, uint size, int num, uint color, int iter){
-	if(num > 0){
-		++_rec_offset;
-		_number_recurse(window, x, y, size, num/10, color, iter+1);
-		draw_number(window, x+(_rec_offset-iter-1)*5*size, y, size, num%10, color);
-	}
-	return _rec_offset;
-}
-
-void drawCharacter(HWND window, uint x, uint y, uint size, BYTE character, uint color){
-	short idx = character*5;
-	for(uint i=0; i < 5; ++i){
-		for(uint j=0; j < 5; ++j){
-			if((font5x5[idx]<<j)&0b10000) drawRectangle(window, x+j*size, y+i*size, size, size, color);
-		}
-		++idx;
-	}
-}
-
-//Gibt die Anzahl der gezeichneten Zeichen zurück
-int drawInt(HWND window, uint x, uint y, uint size, int num, uint color){
-	if(num == 0){
-		draw_number(window, x, y, size, 0, color);
-		return 1;
-	}
-	_rec_offset = 0;
-	if(num < 0){
-		_rec_offset = 1;
-		num *= -1;
-		drawCharacter(window, x, y, size, '-', color);
-	}
-	return _number_recurse(window, x, y, size, num, color, 0);
 }
 
 struct Image{
@@ -393,6 +347,109 @@ ErrCode copyImageToWindow(HWND window, Image& image, int start_x, int start_y, i
 		}
 	}
 	return WINDOW_NOT_FOUND;
+}
+
+struct Font{
+	Image image;
+	ivec2 char_size;		//Größe eines Symbols im Image
+	int font_size = 12;		//Größe der Symbols in Pixel
+	BYTE char_sizes[96];	//Größe der Symbole in x-Richtung
+};
+
+ErrCode loadFont(const char* path, Font& font, ivec2 char_size){
+	ErrCode code;
+	if((code = ErrCheck(loadImage(path, font.image), "font image laden")) != SUCCESS){
+		return code;
+	}
+	//Lese max x von jedem Zeichen
+	font.char_sizes[0] = font.char_size.x/2;	//Leerzeichen
+	for(uint i=1; i < 96; ++i){
+		uint x_max = 0;
+		for(uint y=(i/16)*char_size.y; y < (i/16)*char_size.y+char_size.y; ++y){
+			for(uint x=(i%16)*char_size.x; x < (i%16)*char_size.x+char_size.x; ++x){
+				if(A(font.image.data[y*font.image.width+x]) > 0 && x > x_max){
+					x_max = x;
+				}
+			}
+		}
+		//TODO +10 ???
+		font.char_sizes[i] = x_max - (i%16)*char_size.x + 10;
+	}
+	return SUCCESS;
+}
+
+//Gibt zurück wie breit das Symbol war das gezeichnet wurde
+uint drawFontChar(HWND window, Font& font, char symbol, uint start_x, uint start_y){
+	for(WORD i=0; i < app.window_count; ++i){
+		if(app.windows[i] == window){
+			uint idx = (symbol-32);
+			float div = (float)font.char_size.y/font.font_size;
+			uint end_x = start_x+font.char_sizes[idx]/div;
+			uint end_y = start_y+font.font_size;
+			uint x_offset = (idx%16)*font.char_size.x;
+			uint y_offset = (idx/16)*font.char_size.y;
+			uint buffer_width = app.info[i].window_width/app.info[i].pixel_size;
+			uint* pixels = app.pixels[i];
+			for(uint y=start_y; y < end_y; ++y){
+				float scaled_y = (float)(y-start_y)/(end_y-start_y);
+				for(uint x=start_x; x < end_x; ++x){
+					uint ry = scaled_y*font.char_size.y;
+					uint rx = (float)(x-start_x)/(end_x-start_x)*(font.char_sizes[idx]-1);
+					uint color = font.image.data[(ry+y_offset)*font.image.width+rx+x_offset];
+					if(A(color) > 0) pixels[y*buffer_width+x] = color;
+				}
+			}
+			return end_x-start_x;
+		}
+	}
+	return 0;
+}
+
+//Geht nur von 0-9!!!
+//TODO alle Funktionen hier sind nur auf die 5x5 font abgestimmt, sollte man verallgemeinern
+inline void draw_number(HWND window, uint x, uint y, uint size, BYTE number, uint color){
+	short idx = (number+48)*5;
+	for(uint i=0; i < 5; ++i){
+		for(uint j=0; j < 5; ++j){
+			if((font5x5[idx]<<j)&0b10000) drawRectangle(window, x+j*size, y+i*size, size, size, color);
+		}
+		++idx;
+	}
+}
+
+static int _rec_offset;
+int _number_recurse(HWND window, uint x, uint y, uint size, int num, uint color, int iter){
+	if(num > 0){
+		++_rec_offset;
+		_number_recurse(window, x, y, size, num/10, color, iter+1);
+		draw_number(window, x+(_rec_offset-iter-1)*5*size, y, size, num%10, color);
+	}
+	return _rec_offset;
+}
+
+void drawCharacter(HWND window, uint x, uint y, uint size, BYTE character, uint color){
+	short idx = character*5;
+	for(uint i=0; i < 5; ++i){
+		for(uint j=0; j < 5; ++j){
+			if((font5x5[idx]<<j)&0b10000) drawRectangle(window, x+j*size, y+i*size, size, size, color);
+		}
+		++idx;
+	}
+}
+
+//Gibt die Anzahl der gezeichneten Zeichen zurück
+int drawInt(HWND window, uint x, uint y, uint size, int num, uint color){
+	if(num == 0){
+		draw_number(window, x, y, size, 0, color);
+		return 1;
+	}
+	_rec_offset = 0;
+	if(num < 0){
+		_rec_offset = 1;
+		num *= -1;
+		drawCharacter(window, x, y, size, '-', color);
+	}
+	return _number_recurse(window, x, y, size, num, color, 0);
 }
 
 ErrCode _defaultEvent(void){return SUCCESS;}
@@ -485,19 +542,21 @@ struct Menu{
 	Button buttons[MAX_BUTTONS];
 	WORD button_count = 0;
 	BYTE state = MENU_OPEN;	//Bits: offen, toggle bit für offen, Rest ungenutzt
-	ivec2 pos = {};			//TODO Position in Bildschirmpixelkoordinaten, buttons bekommen zusätzlich diesen offset
+	ivec2 pos = {};			//TODO Position in Bildschirmpixelkoordinaten
 	Label labels[MAX_STRINGS];
 	WORD label_count = 0;
 };
 
 inline constexpr bool checkMenuState(Menu& menu, MENUSTATE state){return (menu.state&state);}
-inline void updateMenu(HWND window, Menu& menu){
+inline void updateMenu(HWND window, Menu& menu, Font& font){
 	if(checkMenuState(menu, MENU_OPEN)){
 		updateButtons(window, menu.buttons, menu.button_count);
 		for(WORD i=0; i < menu.label_count; ++i){
 			Label& label = menu.labels[i];
+			uint offset = 0;
 			for(size_t j=0; j < label.text.size(); ++j){
-				drawCharacter(window, label.pos.x+label.text_size*5*j+j, label.pos.y, label.text_size, label.text[j], label.textcolor);
+				//TODO error tests wären möglich
+				offset += drawFontChar(window, font, label.text[j], label.pos.x+offset, label.pos.y);
 			}
 		}
 	}

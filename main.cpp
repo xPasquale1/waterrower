@@ -11,7 +11,7 @@ extern "C"{
 
 LRESULT CALLBACK basic_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-HANDLE hDevice = open_device("\\\\.\\COM6", 19200);
+//HANDLE hDevice = open_device("\\\\.\\COM6", 19200);
 BYTE receiveBuffer[128];
 BYTE sendBuffer[128];
 Page main_page;
@@ -41,19 +41,23 @@ void refreshData(WORD interval=250){
 		ErrCheck(addRequest(1));
 		ErrCheck(addRequest(2));
 		ErrCheck(addRequest(3));
+		ErrCheck(addRequest(4));
+		ErrCheck(addRequest(5));
 	}
 }
 
 void displayDataPage(){
-	main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist);
-	main_page.menus[0]->labels[1].text = "Zeit: " + std::to_string(rowingData.hrs) + ':' + std::to_string(rowingData.min) + ':' + std::to_string(rowingData.sec);
+	main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist) + 'm';
+	main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + std::to_string(rowingData.ms_total) + "m/s";
+	main_page.menus[0]->labels[2].text = "Durchschnitt: " + std::to_string(rowingData.ms_avg) + "m/s";
+	main_page.menus[0]->labels[3].text = "Zeit: " + std::to_string(rowingData.hrs) + ':' + std::to_string(rowingData.min) + ':' + std::to_string(rowingData.sec);
 }
 
 INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){
 	HWND main_window;
 	ErrCheck(openWindow(hInstance, 800, 800, 2, main_window, "waterrower", basic_window_callback), "open main window");
 
-	init_communication(hDevice, sendBuffer, receiveBuffer);
+//	init_communication(hDevice, sendBuffer, receiveBuffer);
 	ErrCheck(loadStartPage(), "laden des Startbildschirms");
 
 	while(app.window_count){
@@ -64,21 +68,21 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 		ErrCheck(drawWindow(main_window), "draw window");
 
-		refreshData();
-		transmitRequests(hDevice);
+//		refreshData();
+//		transmitRequests(hDevice);
 
-		int length = readPacket(hDevice, receiveBuffer, 128);
-		if(length > 0){
-			checkCode(receiveBuffer, length);
-		}
+//		int length = readPacket(hDevice, receiveBuffer, 128);
+//		if(length > 0){
+//			checkCode(receiveBuffer, length);
+//		}
 		getMessages();	//TODO frägt alle windows ab, könnte evtl nicht nötig sein
 	}
 
 	//Aufräumen
 	destroyPage(main_page);
 	strcpy((char*)sendBuffer, "EXIT");
-	sendPacket(hDevice, sendBuffer, sizeof("EXIT")-1);
-	CloseHandle(hDevice);
+//	sendPacket(hDevice, sendBuffer, sizeof("EXIT")-1);
+//	CloseHandle(hDevice);
 	return 0;
 }
 
@@ -106,7 +110,7 @@ LRESULT CALLBACK basic_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPAR
 		break;
 	}
 	case WM_RBUTTONDOWN:{
-		if(getButton(mouse, MOUSE_RMB)){
+		if(!getButton(mouse, MOUSE_RMB)){
 
 		};
 		setButton(mouse, MOUSE_RMB);
@@ -162,14 +166,13 @@ ErrCode switchToStartPage(){
 	menu1->buttons[0].text = "START";
 	menu1->buttons[0].image = buttonImage;
 	menu1->button_count = 1;
-
 	main_page.menus[0] = menu1;
 	main_page.menu_count = 1;
 
 	main_page.code = _default_page_function;
 
-	strcpy((char*)sendBuffer, "RESET");
-	sendPacket(hDevice, sendBuffer, sizeof("RESET")-1);
+//	strcpy((char*)sendBuffer, "RESET");
+//	sendPacket(hDevice, sendBuffer, sizeof("RESET")-1);
 
 	return SUCCESS;
 }
@@ -194,11 +197,21 @@ ErrCode switchToFreeTrainingPage(){
 	menu1->buttons[0].image = buttonImage;
 	menu1->button_count = 1;
 
+	Font* font = new Font;
+	font->char_size = {82, 83};
+	font->font_size = 31;
+	ErrCheck(loadFont("fonts/ascii.tex", *font, font->char_size), "font laden");
+	main_page.font = font;
+
 	menu1->labels[0].pos = {20, 20};
 	menu1->labels[0].text_size = 4;
-	menu1->labels[1].pos = {20, 80};
+	menu1->labels[1].pos = {20, 56};
 	menu1->labels[1].text_size = 4;
-	menu1->label_count = 2;
+	menu1->labels[2].pos = {20, 92};
+	menu1->labels[2].text_size = 4;
+	menu1->labels[3].pos = {20, 128};
+	menu1->labels[3].text_size = 4;
+	menu1->label_count = 4;
 
 	main_page.menus[0] = menu1;
 	main_page.menu_count = 1;

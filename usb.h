@@ -171,6 +171,16 @@ ErrCode addRequest(DWORD id){
 		requests[request_ptr1].length = sizeof("IRS1e3")-1;
 		break;
 	}
+	case 4:{	//Meter pro Sekunde total Abfrage
+		strcpy((char*)requests[request_ptr1].data, "IRD148");
+		requests[request_ptr1].length = sizeof("IRD148")-1;
+		break;
+	}
+	case 5:{	//Meter pro Sekunde durschnitt Abfrage
+		strcpy((char*)requests[request_ptr1].data, "IRD14a");
+		requests[request_ptr1].length = sizeof("IRD14a")-1;
+		break;
+	}
 	}
 	request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
 	return SUCCESS;
@@ -216,16 +226,18 @@ constexpr inline int codeToInt(const char* code){
 int checkCode(BYTE* receiveBuffer, int length){
 	BYTE code[3]; code[0] = receiveBuffer[0]; code[1] = receiveBuffer[1]; code[2] = receiveBuffer[2];
 	switch(codeToInt((char*)code)){
-	case codeToInt("ERR"):{
+
+	case codeToInt("ERR"):{	//Fehlermeldung
 		print_packet(receiveBuffer, length);
 		break;
 	}
-	case codeToInt("IDT"):{
+
+	case codeToInt("IDT"):{	//Dreifacher Speicherbereich
 		BYTE value[7]; value[6] = '\0';
 		for(int i=0; i < 6; ++i){
 			value[i] = receiveBuffer[i+6];
 		}
-		BYTE location[3];	//TODO naja das könnte ja eigentlich alles sein, daher noch den Speicherbereich checken
+		BYTE location[3];	//TODO naja das könnte ja eigentlich alles sein, daher noch den Speicherbereich checken wie unten
 		for(int i=0; i < 3; ++i){
 			location[i] = receiveBuffer[i+3];
 		}
@@ -233,7 +245,31 @@ int checkCode(BYTE* receiveBuffer, int length){
 		print_packet(receiveBuffer, length);
 		break;
 	}
-	case codeToInt("IDS"):{
+
+	case codeToInt("IDD"):{	//Doppelter Speicherbereich
+		BYTE value[5]; value[4] = '\0';
+		for(int i=0; i < 2; ++i){
+			value[i] = receiveBuffer[i+6];
+		}
+		BYTE location[3];
+		for(int i=0; i < 3; ++i){
+			location[i] = receiveBuffer[i+3];
+		}
+		switch(codeToInt((char*)location)){
+		case codeToInt("148"):{
+			rowingData.ms_total = strtol((char*)value, 0, 10);
+			break;
+		}
+		case codeToInt("14a"):{
+			rowingData.ms_avg = strtol((char*)value, 0, 10);
+			break;
+		}
+		}
+		print_packet(receiveBuffer, length);
+		break;
+	}
+
+	case codeToInt("IDS"):{	//Einzelner Speicherbereich
 		BYTE value[3]; value[2] = '\0';
 		for(int i=0; i < 2; ++i){
 			value[i] = receiveBuffer[i+6];
@@ -259,6 +295,7 @@ int checkCode(BYTE* receiveBuffer, int length){
 		print_packet(receiveBuffer, length);
 		break;
 	}
+
 	}
 	return 0;
 }
