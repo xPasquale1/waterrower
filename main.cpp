@@ -9,7 +9,7 @@ extern "C"{
 #include "usb.h"
 #include "pages.h"
 
-#define NO_DEVICE
+//#define NO_DEVICE
 
 LRESULT CALLBACK basic_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -21,7 +21,6 @@ BYTE sendBuffer[128];
 Page main_page;
 BYTE page_switch = 0;	//0 kein wechsel, 1 wechsel zur startseite, 2 free training seite
 
-SYSTEMTIME last_request_tp2 = {};
 //Intervall in Millisekunden, sollte nicht < 26 sein
 ErrCode loadStartPage(){page_switch = 1; return SUCCESS;};
 ErrCode loadFreeTrainingPage(){page_switch = 2; return SUCCESS;};
@@ -29,6 +28,7 @@ ErrCode switchToStartPage();
 ErrCode switchToFreeTrainingPage();
 ErrCode switchPage();
 void refreshData(WORD interval=250){
+	static SYSTEMTIME last_request_tp2 = {};
 	SYSTEMTIME systemTime;
 	GetSystemTime(&systemTime);
 	DWORD newmilli = systemTime.wMilliseconds;
@@ -47,10 +47,14 @@ void refreshData(WORD interval=250){
 		ErrCheck(addRequest(3));
 		ErrCheck(addRequest(4));
 		ErrCheck(addRequest(5));
+		ErrCheck(addRequest(6));
+		ErrCheck(addRequest(7));
+		ErrCheck(addRequest(8));
 	}
 }
 
 void displayDataPage(){
+	refreshData(250);
 	main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist) + 'm';
 	main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + std::to_string(rowingData.ms_total) + "m/s";
 	main_page.menus[0]->labels[2].text = "Durchschnitt: " + std::to_string(rowingData.ms_avg) + "m/s";
@@ -74,10 +78,9 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 		ErrCheck(drawWindow(main_window), "draw window");
 
 #ifndef NO_DEVICE
-		refreshData();
 		transmitRequests(hDevice);
 
-		int length = readPacket(hDevice, receiveBuffer, 128);
+		int length = readPacket(hDevice, receiveBuffer, sizeof(receiveBuffer));
 		if(length > 0){
 			checkCode(receiveBuffer, length);
 		}
@@ -109,7 +112,7 @@ LRESULT CALLBACK basic_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPAR
 	}
 	case WM_LBUTTONDOWN:{
 		if(!getButton(mouse, MOUSE_LMB)){
-			ErrCheck(addRequest(5));
+			ErrCheck(addRequest(8));
 		};
 		setButton(mouse, MOUSE_LMB);
 		break;

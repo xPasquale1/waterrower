@@ -135,6 +135,7 @@ int init_communication(HANDLE hDevice, BYTE* sendBuffer, BYTE* receiveBuffer){
 /* Der Waterrower sollte nicht mit Packeten überlastet werden, daher wird empfohlen nur ca. alle 25ms ein Packet zu senden
    Diese Funktionen senden requests für e.g. Speicherdaten,... indem die Packete in eine Warteschlange eingereiht werden
    und alle 25ms das Erste gesendet wird
+   TODO sollte nicht im Stack angelegt werden... denke ich mal...
 */
 
 struct Request{
@@ -154,36 +155,65 @@ ErrCode addRequest(DWORD id){
 	case 0:{	//Distanzabfrage
 		strcpy((char*)requests[request_ptr1].data, "IRT057");
 		requests[request_ptr1].length = sizeof("IRT057")-1;
-		break;
+		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		return SUCCESS;
 	}
 	case 1:{	//Sekundenabfrage
 		strcpy((char*)requests[request_ptr1].data, "IRS1E1");
 		requests[request_ptr1].length = sizeof("IRS1e1")-1;
-		break;
+		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		return SUCCESS;
 	}
 	case 2:{	//Minutenabfrage
 		strcpy((char*)requests[request_ptr1].data, "IRS1E2");
 		requests[request_ptr1].length = sizeof("IRS1e2")-1;
-		break;
+		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		return SUCCESS;
 	}
 	case 3:{	//Stundenabfrage
 		strcpy((char*)requests[request_ptr1].data, "IRS1E3");
 		requests[request_ptr1].length = sizeof("IRS1e3")-1;
-		break;
+		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		return SUCCESS;
 	}
 	case 4:{	//Meter pro Sekunde total Abfrage
 		strcpy((char*)requests[request_ptr1].data, "IRD148");
 		requests[request_ptr1].length = sizeof("IRD148")-1;
-		break;
+		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		return SUCCESS;
 	}
 	case 5:{	//Meter pro Sekunde durschnitt Abfrage
-		strcpy((char*)requests[request_ptr1].data, "IRD14a");
-		requests[request_ptr1].length = sizeof("IRD14a")-1;
-		break;
+		strcpy((char*)requests[request_ptr1].data, "IRD14A");
+		requests[request_ptr1].length = sizeof("IRD14A")-1;
+		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		return SUCCESS;
+	}
+	case 6:{	//Strokes Zähler
+		strcpy((char*)requests[request_ptr1].data, "IRD140");
+		requests[request_ptr1].length = sizeof("IRD140")-1;
+		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		return SUCCESS;
+	}
+	case 7:{	//Durchschnittszeit für einen gesamten Stroke
+		strcpy((char*)requests[request_ptr1].data, "IRS142");
+		requests[request_ptr1].length = sizeof("IRS142")-1;
+		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		return SUCCESS;
+	}
+	case 8:{	//Durschnittzeit für einen Zug (von Beschleunigung bis Entschleunigung)
+		strcpy((char*)requests[request_ptr1].data, "IRS143");
+		requests[request_ptr1].length = sizeof("IRS143")-1;
+		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		return SUCCESS;
+	}
+	case 9:{	//Wasservolumen
+		strcpy((char*)requests[request_ptr1].data, "IRS0A9");
+		requests[request_ptr1].length = sizeof("IRS0A9")-1;
+		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		return SUCCESS;
 	}
 	}
-	request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
-	return SUCCESS;
+	return REQUEST_NOT_FOUND;
 }
 
 //Diese Funktion sendet die erste request aus der Warteschlange zum waterrower sobald 25ms seit der Letzten verstrichen sind
@@ -209,20 +239,25 @@ int transmitRequests(HANDLE hDevice){
 }
 
 struct RowingData{
-	WORD dist = 0;
-	WORD ms_total = 0;
-	WORD ms_avg = 0;
-	BYTE sec = 0;
-	BYTE min = 0;
-	BYTE hrs = 0;
+	WORD dist = 0;			//Distanz zurückgelegt
+	WORD ms_total = 0;		//Aktuelle Beschleunigung
+	WORD ms_avg = 0;		//Durschnittliche Beschleunigung
+	BYTE sec = 0;			//Ruderzeit in Sekunden
+	BYTE min = 0;			//Ruderzeit in Minuten
+	BYTE hrs = 0;			//Ruderzeit in Stunden
+	WORD strokes = 0;		//Anzahl der Strokes
+	BYTE stroke_avg = 0;	//Durschnittliche Zeit für einen Stroke
+	BYTE stroke_pull = 0;	//Durschnittliche Zeit für einen Zug (Von Beschleunigung bis Entschleunigung)
+	BYTE volume = 0;		//Volumen an Wasser im Wassertank
 }; static RowingData rowingData;
 
+//3 Bytes zu int
 constexpr inline int codeToInt(const char* code){
 	return (code[0]|code[1]<<8|code[2]<<16);
 }
 
 //TODO idk warum diese Funktion einen Rückgabewert hat
-//ich meine man könnte es asl einen Fehler ansehen wenn es den Code nicht gibt...
+//ich meine man könnte es als einen Fehler ansehen wenn es den Code nicht gibt...
 int checkCode(BYTE* receiveBuffer, int length){
 	BYTE code[3]; code[0] = receiveBuffer[0]; code[1] = receiveBuffer[1]; code[2] = receiveBuffer[2];
 	switch(codeToInt((char*)code)){
@@ -257,11 +292,15 @@ int checkCode(BYTE* receiveBuffer, int length){
 		}
 		switch(codeToInt((char*)location)){
 		case codeToInt("148"):{
-			rowingData.ms_total = strtol((char*)value, 0, 10);
+			rowingData.ms_total = strtol((char*)value, 0, 16);
 			break;
 		}
-		case codeToInt("14a"):{
-			rowingData.ms_avg = strtol((char*)value, 0, 10);
+		case codeToInt("14A"):{
+			rowingData.ms_avg = strtol((char*)value, 0, 16);
+			break;
+		}
+		case codeToInt("140"):{
+			rowingData.strokes = strtol((char*)value, 0, 16);
 			break;
 		}
 		}
@@ -280,15 +319,27 @@ int checkCode(BYTE* receiveBuffer, int length){
 		}
 		switch(codeToInt((char*)location)){
 		case codeToInt("1E1"):{
-			rowingData.sec = strtol((char*)value, 0, 10);
+			rowingData.sec = strtol((char*)value, 0, 16);
 			break;
 		}
 		case codeToInt("1E2"):{
-			rowingData.min = strtol((char*)value, 0, 10);
+			rowingData.min = strtol((char*)value, 0, 16);
 			break;
 		}
 		case codeToInt("1E3"):{
-			rowingData.hrs = strtol((char*)value, 0, 10);
+			rowingData.hrs = strtol((char*)value, 0, 16);
+			break;
+		}
+		case codeToInt("142"):{
+			rowingData.stroke_avg = strtol((char*)value, 0, 16);
+			break;
+		}
+		case codeToInt("143"):{
+			rowingData.stroke_pull = strtol((char*)value, 0, 16);
+			break;
+		}
+		case codeToInt("0A9"):{
+			rowingData.volume = strtol((char*)value, 0, 16);
 			break;
 		}
 		}

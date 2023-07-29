@@ -19,7 +19,8 @@ enum ErrCode{
 	FILE_NOT_FOUND,
 	QUEUE_FULL,
 	WINDOW_NOT_FOUND,
-	TOO_MANY_WINDOWS
+	TOO_MANY_WINDOWS,
+	REQUEST_NOT_FOUND
 };
 enum ErrCodeFlags{
 	NO_ERR_FLAG = 0,
@@ -50,6 +51,9 @@ inline constexpr ErrCode ErrCheck(ErrCode code, const char* msg="\0", ErrCodeFla
 	case TOO_MANY_WINDOWS:
 		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[TOO_MANY_WINDOWS ERROR] " << msg << std::endl;
 		return TOO_MANY_WINDOWS;
+	case REQUEST_NOT_FOUND:
+		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[REQUEST_NOT_FOUND ERROR] " << msg << std::endl;
+		return REQUEST_NOT_FOUND;
 	default: return SUCCESS;
 	}
 	return SUCCESS;
