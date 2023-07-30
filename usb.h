@@ -7,6 +7,9 @@ extern "C"{
 #include <setupapi.h>
 #include "util.h"
 
+#define SILENT		//Packete werden nicht in den output stream geschrieben
+//#define SHOW_ERRORS	//Überschreibt SILENT nur für Fehlernachrichten
+
 //ret: Handle für das Gerät
 HANDLE open_device(const char* devicePath = "\\\\.\\COM3", DWORD baudrate = 9600){
 	HANDLE hDevice = CreateFile(devicePath, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0);
@@ -57,7 +60,7 @@ int sendData(HANDLE hDevice, BYTE* data, DWORD length){
 }
 
 //Liest die Daten im Empfangspuffer, diese können noch unvollständig sein
-//ret: Anzahl der gesendeten Bytes
+//ret: Anzahl der gelesenen Bytes
 int readData(HANDLE hDevice, BYTE* data, DWORD length){
 	DWORD bytesRead;
 	if(!ReadFile(hDevice, data, length, &bytesRead, 0)){
@@ -124,18 +127,21 @@ int init_communication(HANDLE hDevice, BYTE* sendBuffer, BYTE* receiveBuffer){
 	strcpy((char*)sendBuffer, "USB");
 	sendPacket(hDevice, sendBuffer, sizeof("USB")-1);
 	while((length = readPacket(hDevice, receiveBuffer, 128)) < 1);
+#ifndef SILENT
 	print_packet(receiveBuffer, length);
+#endif
 	strcpy((char*)sendBuffer, "IV?");
 	sendPacket(hDevice, sendBuffer, sizeof("IV?")-1);
 	while((length = readPacket(hDevice, receiveBuffer, 128)) < 1);
+#ifndef SILENT
 	print_packet(receiveBuffer, length);
+#endif
 	return 0;
 }
 
 /* Der Waterrower sollte nicht mit Packeten überlastet werden, daher wird empfohlen nur ca. alle 25ms ein Packet zu senden
    Diese Funktionen senden requests für e.g. Speicherdaten,... indem die Packete in eine Warteschlange eingereiht werden
    und alle 25ms das Erste gesendet wird
-   TODO sollte nicht im Stack angelegt werden... denke ich mal...
 */
 
 struct Request{
@@ -143,73 +149,76 @@ struct Request{
 	BYTE length;	//Länge der Nachricht
 };
 static SYSTEMTIME last_request_tp = {};
+
 #define REQUEST_QUEUE_SIZE 50
-static Request requests[REQUEST_QUEUE_SIZE];
-static int request_ptr1 = 0;
-static int request_ptr2 = 0;
+struct RequestQueue{
+	Request requests[REQUEST_QUEUE_SIZE];
+	WORD request_ptr1 = 0;
+	WORD request_ptr2 = 0;
+};
 
 //Fügt eine request in die Warteschlange ein, id gibt die request an
-ErrCode addRequest(DWORD id){
-	if((request_ptr1+1)%(REQUEST_QUEUE_SIZE) == request_ptr2) return QUEUE_FULL;	//Warteschlange voll
+ErrCode addRequest(RequestQueue& queue, DWORD id){
+	if((queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE) == queue.request_ptr2) return QUEUE_FULL;	//Warteschlange voll
 	switch(id){
 	case 0:{	//Distanzabfrage
-		strcpy((char*)requests[request_ptr1].data, "IRT057");
-		requests[request_ptr1].length = sizeof("IRT057")-1;
-		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		strcpy((char*)queue.requests[queue.request_ptr1].data, "IRT057");
+		queue.requests[queue.request_ptr1].length = sizeof("IRT057")-1;
+		queue.request_ptr1 = (queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE);
 		return SUCCESS;
 	}
 	case 1:{	//Sekundenabfrage
-		strcpy((char*)requests[request_ptr1].data, "IRS1E1");
-		requests[request_ptr1].length = sizeof("IRS1e1")-1;
-		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		strcpy((char*)queue.requests[queue.request_ptr1].data, "IRS1E1");
+		queue.requests[queue.request_ptr1].length = sizeof("IRS1e1")-1;
+		queue.request_ptr1 = (queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE);
 		return SUCCESS;
 	}
 	case 2:{	//Minutenabfrage
-		strcpy((char*)requests[request_ptr1].data, "IRS1E2");
-		requests[request_ptr1].length = sizeof("IRS1e2")-1;
-		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		strcpy((char*)queue.requests[queue.request_ptr1].data, "IRS1E2");
+		queue.requests[queue.request_ptr1].length = sizeof("IRS1e2")-1;
+		queue.request_ptr1 = (queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE);
 		return SUCCESS;
 	}
 	case 3:{	//Stundenabfrage
-		strcpy((char*)requests[request_ptr1].data, "IRS1E3");
-		requests[request_ptr1].length = sizeof("IRS1e3")-1;
-		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		strcpy((char*)queue.requests[queue.request_ptr1].data, "IRS1E3");
+		queue.requests[queue.request_ptr1].length = sizeof("IRS1e3")-1;
+		queue.request_ptr1 = (queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE);
 		return SUCCESS;
 	}
 	case 4:{	//Meter pro Sekunde total Abfrage
-		strcpy((char*)requests[request_ptr1].data, "IRD148");
-		requests[request_ptr1].length = sizeof("IRD148")-1;
-		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		strcpy((char*)queue.requests[queue.request_ptr1].data, "IRD148");
+		queue.requests[queue.request_ptr1].length = sizeof("IRD148")-1;
+		queue.request_ptr1 = (queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE);
 		return SUCCESS;
 	}
 	case 5:{	//Meter pro Sekunde durschnitt Abfrage
-		strcpy((char*)requests[request_ptr1].data, "IRD14A");
-		requests[request_ptr1].length = sizeof("IRD14A")-1;
-		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		strcpy((char*)queue.requests[queue.request_ptr1].data, "IRD14A");
+		queue.requests[queue.request_ptr1].length = sizeof("IRD14A")-1;
+		queue.request_ptr1 = (queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE);
 		return SUCCESS;
 	}
 	case 6:{	//Strokes Zähler
-		strcpy((char*)requests[request_ptr1].data, "IRD140");
-		requests[request_ptr1].length = sizeof("IRD140")-1;
-		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		strcpy((char*)queue.requests[queue.request_ptr1].data, "IRD140");
+		queue.requests[queue.request_ptr1].length = sizeof("IRD140")-1;
+		queue.request_ptr1 = (queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE);
 		return SUCCESS;
 	}
 	case 7:{	//Durchschnittszeit für einen gesamten Stroke
-		strcpy((char*)requests[request_ptr1].data, "IRS142");
-		requests[request_ptr1].length = sizeof("IRS142")-1;
-		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		strcpy((char*)queue.requests[queue.request_ptr1].data, "IRS142");
+		queue.requests[queue.request_ptr1].length = sizeof("IRS142")-1;
+		queue.request_ptr1 = (queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE);
 		return SUCCESS;
 	}
 	case 8:{	//Durschnittzeit für einen Zug (von Beschleunigung bis Entschleunigung)
-		strcpy((char*)requests[request_ptr1].data, "IRS143");
-		requests[request_ptr1].length = sizeof("IRS143")-1;
-		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		strcpy((char*)queue.requests[queue.request_ptr1].data, "IRS143");
+		queue.requests[queue.request_ptr1].length = sizeof("IRS143")-1;
+		queue.request_ptr1 = (queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE);
 		return SUCCESS;
 	}
 	case 9:{	//Wasservolumen
-		strcpy((char*)requests[request_ptr1].data, "IRS0A9");
-		requests[request_ptr1].length = sizeof("IRS0A9")-1;
-		request_ptr1 = (request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		strcpy((char*)queue.requests[queue.request_ptr1].data, "IRS0A9");
+		queue.requests[queue.request_ptr1].length = sizeof("IRS0A9")-1;
+		queue.request_ptr1 = (queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE);
 		return SUCCESS;
 	}
 	}
@@ -217,9 +226,8 @@ ErrCode addRequest(DWORD id){
 }
 
 //Diese Funktion sendet die erste request aus der Warteschlange zum waterrower sobald 25ms seit der Letzten verstrichen sind
-//TODO idk warum diese Funktion einen Rückgabewert hat
-int transmitRequests(HANDLE hDevice){
-	if(request_ptr1 == request_ptr2) return 1;	//Keine Daten in der Warteschlange
+void transmitRequests(RequestQueue& queue, HANDLE hDevice){
+	if(queue.request_ptr1 == queue.request_ptr2) return;	//Keine Daten in der Warteschlange
 	SYSTEMTIME systemTime;
 	GetSystemTime(&systemTime);
 	DWORD newmilli = systemTime.wMilliseconds;
@@ -232,10 +240,9 @@ int transmitRequests(HANDLE hDevice){
 	currentmilli += last_request_tp.wHour*3600000;
 	if(newmilli - currentmilli > 25){
 		last_request_tp = systemTime;
-		sendPacket(hDevice, requests[request_ptr2].data, requests[request_ptr2].length);
-		request_ptr2 = (request_ptr2+1)%(REQUEST_QUEUE_SIZE);
+		sendPacket(hDevice, queue.requests[queue.request_ptr2].data, queue.requests[queue.request_ptr2].length);
+		queue.request_ptr2 = (queue.request_ptr2+1)%(REQUEST_QUEUE_SIZE);
 	}
-	return 0;
 }
 
 struct RowingData{
@@ -263,7 +270,11 @@ int checkCode(BYTE* receiveBuffer, int length){
 	switch(codeToInt((char*)code)){
 
 	case codeToInt("ERR"):{	//Fehlermeldung
+#if defined(SHOW_ERRORS)
 		print_packet(receiveBuffer, length);
+#elif !defined(SILENT)
+		print_packet(receiveBuffer, length);
+#endif
 		break;
 	}
 
@@ -282,7 +293,9 @@ int checkCode(BYTE* receiveBuffer, int length){
 			break;
 		}
 		}
+#ifndef SILENT
 		print_packet(receiveBuffer, length);
+#endif
 		break;
 	}
 
@@ -309,7 +322,9 @@ int checkCode(BYTE* receiveBuffer, int length){
 			break;
 		}
 		}
+#ifndef SILENT
 		print_packet(receiveBuffer, length);
+#endif
 		break;
 	}
 
@@ -348,7 +363,9 @@ int checkCode(BYTE* receiveBuffer, int length){
 			break;
 		}
 		}
+#ifndef SILENT
 		print_packet(receiveBuffer, length);
+#endif
 		break;
 	}
 

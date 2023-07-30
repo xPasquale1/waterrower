@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <math.h>
 
 typedef unsigned char BYTE;
 typedef unsigned int uint;
@@ -70,3 +71,9 @@ struct Mouse{
 inline constexpr bool getButton(Mouse& mouse, MOUSEBUTTON button){return (mouse.button & button);}
 inline constexpr void setButton(Mouse& mouse, MOUSEBUTTON button){mouse.button |= button;}
 inline constexpr void resetButton(Mouse& mouse, MOUSEBUTTON button){mouse.button &= ~button;}
+
+inline std::string float_to_string(float value, BYTE decimals=2){
+	WORD precision = pow(10, decimals);	//TODO könnte constexpr sein...
+	DWORD val = value * precision;
+	return std::to_string(val/precision) + '.' + std::to_string(val%precision);
+}

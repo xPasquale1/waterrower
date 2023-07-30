@@ -16,8 +16,10 @@ LRESULT CALLBACK basic_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPAR
 #ifndef NO_DEVICE
 HANDLE hDevice = open_device("\\\\.\\COM6", 19200);
 #endif
+//TODO Ein paar Dinge hier sollten bei Zeit mal vom Stack runter, nicht das hier Böses passiert
 BYTE receiveBuffer[128];
 BYTE sendBuffer[128];
+RequestQueue queue;
 Page main_page;
 BYTE page_switch = 0;	//0 kein wechsel, 1 wechsel zur startseite, 2 free training seite
 Font* default_font = nullptr;
@@ -27,7 +29,7 @@ ErrCode loadFreeTrainingPage(){page_switch = 2; return SUCCESS;};
 ErrCode switchToStartPage();
 ErrCode switchToFreeTrainingPage();
 ErrCode switchPage();
-void refreshData(WORD interval=250){
+void refreshData(RequestQueue& queue, WORD interval=250){
 	static SYSTEMTIME last_request_tp2 = {};
 	SYSTEMTIME systemTime;
 	GetSystemTime(&systemTime);
@@ -41,34 +43,41 @@ void refreshData(WORD interval=250){
 	currentmilli += last_request_tp2.wHour*3600000;
 	if(newmilli - currentmilli > interval){
 		last_request_tp2 = systemTime;
-		ErrCheck(addRequest(0));
-		ErrCheck(addRequest(1));
-		ErrCheck(addRequest(2));
-		ErrCheck(addRequest(3));
-		ErrCheck(addRequest(4));
-		ErrCheck(addRequest(5));
-		ErrCheck(addRequest(6));
-		ErrCheck(addRequest(7));
-		ErrCheck(addRequest(8));
+		ErrCheck(addRequest(queue, 0));
+		ErrCheck(addRequest(queue, 1));
+		ErrCheck(addRequest(queue, 2));
+		ErrCheck(addRequest(queue, 3));
+		ErrCheck(addRequest(queue, 4));
+		ErrCheck(addRequest(queue, 5));
+		ErrCheck(addRequest(queue, 6));
+		ErrCheck(addRequest(queue, 7));
+		ErrCheck(addRequest(queue, 8));
 	}
 }
 
 void displayDataPage(){
 #ifndef NO_DEVICE
-	refreshData(250);
+		refreshData(queue, 250);
 #endif
 	main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist) + 'm';
 	main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + std::to_string(rowingData.ms_total) + "m/s";
-	main_page.menus[0]->labels[2].text = "Durchschnittlich: " + std::to_string(rowingData.ms_avg) + "m/s";
+	float avg_ms = 0;
+	uint total_sec = rowingData.sec+rowingData.min*60+rowingData.hrs*3600;
+	if(total_sec > 0){
+		avg_ms = (float)rowingData.dist/total_sec;
+	}
+	main_page.menus[0]->labels[2].text = "Durchschnittlich: " + float_to_string(avg_ms) + "m/s";
 	main_page.menus[0]->labels[3].text = "Zeit: " + std::to_string(rowingData.hrs) + ':' + std::to_string(rowingData.min) + ':' + std::to_string(rowingData.sec);
 }
 
 INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){
 	HWND main_window;
 	ErrCheck(openWindow(hInstance, 800, 800, 2, main_window, "waterrower", basic_window_callback), "open main window");
+
 #ifndef NO_DEVICE
 	init_communication(hDevice, sendBuffer, receiveBuffer);
 #endif
+
 	default_font = new Font;
 	ErrCheck(loadFont("fonts/ascii.tex", *default_font, {82, 83}), "font laden");
 	default_font->font_size = 31;
@@ -80,12 +89,13 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 		ErrCheck(clearWindow(main_window), "clear window");
 
 		updatePage(main_page, main_window);
+
 		switchPage();
 
 		ErrCheck(drawWindow(main_window), "draw window");
 
 #ifndef NO_DEVICE
-		transmitRequests(hDevice);
+		transmitRequests(queue, hDevice);
 
 		int length = readPacket(hDevice, receiveBuffer, sizeof(receiveBuffer));
 		if(length > 0){
@@ -120,7 +130,7 @@ LRESULT CALLBACK basic_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPAR
 	}
 	case WM_LBUTTONDOWN:{
 		if(!getButton(mouse, MOUSE_LMB)){
-			ErrCheck(addRequest(8));
+
 		};
 		setButton(mouse, MOUSE_LMB);
 		break;
@@ -220,13 +230,13 @@ ErrCode switchToFreeTrainingPage(){
 	menu1->button_count = 1;
 
 	menu1->labels[0].pos = {20, 20};
-	menu1->labels[0].text_size = 4;
+	menu1->labels[0].text_size = 31;
 	menu1->labels[1].pos = {20, 56};
-	menu1->labels[1].text_size = 4;
+	menu1->labels[1].text_size = 31;
 	menu1->labels[2].pos = {20, 92};
-	menu1->labels[2].text_size = 4;
+	menu1->labels[2].text_size = 31;
 	menu1->labels[3].pos = {20, 128};
-	menu1->labels[3].text_size = 4;
+	menu1->labels[3].text_size = 31;
 	menu1->label_count = 4;
 
 	main_page.menus[0] = menu1;

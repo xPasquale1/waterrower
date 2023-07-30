@@ -351,7 +351,7 @@ ErrCode copyImageToWindow(HWND window, Image& image, int start_x, int start_y, i
 struct Font{
 	Image image;
 	ivec2 char_size;		//Größe eines Symbols im Image
-	int font_size = 12;		//Größe der Symbols in Pixel
+	WORD font_size = 12;	//Größe der Symbols in Pixel
 	BYTE char_sizes[96];	//Größe der Symbole in x-Richtung
 };
 
@@ -375,6 +375,17 @@ ErrCode loadFont(const char* path, Font& font, ivec2 char_size){
 		font.char_sizes[i] = x_max - (i%16)*char_size.x + 8;
 	}
 	return SUCCESS;
+}
+
+//Gibts zurück wie viele Pixel der Text unter der gegebenen Font benötigt
+WORD getStringFontSize(Font& font, std::string& text){
+	float div = (float)font.char_size.y/font.font_size;
+	WORD offset = 0;
+	for(size_t i=0; i < text.size(); ++i){
+		BYTE idx = (text[i]-32);
+		offset += font.char_sizes[idx]/div;
+	}
+	return offset;
 }
 
 //Gibt zurück wie breit das Symbol war das gezeichnet wurde
@@ -427,7 +438,7 @@ struct Button{
 	uint color = RGBA(120, 120, 120);
 	uint hover_color = RGBA(120, 120, 255);
 	uint textcolor = RGBA(180, 180, 180);
-	uint textsize = 24;
+	WORD textsize = 16;
 };
 
 inline constexpr bool checkButtonState(Button& button, BUTTONSTATE state){return (button.state&state);}
@@ -465,20 +476,21 @@ inline void drawButtons(HWND window, Font& font, Button* buttons, WORD button_co
 			}else
 				copyImageToWindow(window, *b.image, b.pos.x, b.pos.y, b.pos.x+b.size.x, b.pos.y+b.size.y);
 		}
-		if(checkButtonState(b, BUTTON_TEXT_CENTER)){	//TODO fix
+		if(checkButtonState(b, BUTTON_TEXT_CENTER)){
 			uint offset = 0;
-			int tmp_font_size = font.font_size;
+			WORD tmp_font_size = font.font_size;
 			font.font_size = b.textsize;
-			for(size_t i=0; i < b.text.size(); ++i){	//+10 ist nur temporär als fix von oben
-				offset += drawFontChar(window, font, b.text[i], b.pos.x+offset+10, b.pos.y+b.size.y/2-b.textsize/2);
+			WORD str_size = getStringFontSize(font, b.text);
+			for(size_t i=0; i < b.text.size(); ++i){
+				offset += drawFontChar(window, font, b.text[i], b.pos.x+offset+b.size.x/2-str_size/2, b.pos.y+b.size.y/2-b.textsize/2);
 			}
 			font.font_size = tmp_font_size;
 		}else{
 			uint offset = 0;
-			int tmp_font_size = font.font_size;
+			WORD tmp_font_size = font.font_size;
 			font.font_size = b.textsize;
-			for(size_t i=0; i < b.text.size(); ++i){	//+10 ist nur temporär als fix von oben
-				offset += drawFontChar(window, font, b.text[i], b.pos.x+offset+10, b.pos.y+b.size.y/2-b.textsize/2);
+			for(size_t i=0; i < b.text.size(); ++i){
+				offset += drawFontChar(window, font, b.text[i], b.pos.x+offset, b.pos.y+b.size.y/2-b.textsize/2);
 			}
 			font.font_size = tmp_font_size;
 		}
@@ -521,7 +533,10 @@ inline void updateMenu(HWND window, Menu& menu, Font& font){
 			uint offset = 0;
 			for(size_t j=0; j < label.text.size(); ++j){
 				//TODO error tests wären möglich
+				WORD tmp = font.font_size;
+				font.font_size = label.text_size;
 				offset += drawFontChar(window, font, label.text[j], label.pos.x+offset, label.pos.y);
+				font.font_size = tmp;
 			}
 		}
 	}
