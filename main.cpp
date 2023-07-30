@@ -193,9 +193,17 @@ ErrCode switchToStartPage(){
 	menu1->buttons[0].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
 	menu1->buttons[0].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
 	menu1->buttons[0].event = loadFreeTrainingPage;
-	menu1->buttons[0].text = "START";
+	menu1->buttons[0].text = "Freies Training";
 	menu1->buttons[0].image = buttonImage;
-	menu1->button_count = 1;
+	menu1->buttons[1].pos = {pos.x, pos.y+size.y+5};
+	menu1->buttons[1].size = {size.x, size.y};
+	menu1->buttons[1].repos = {(int)(pos.x-size.x*0.05), (int)(menu1->buttons[1].pos.y-size.y*0.05)};
+	menu1->buttons[1].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
+//	menu1->buttons[1].event = loadFreeTrainingPage;
+	menu1->buttons[1].text = "Cooler Button";
+	menu1->buttons[1].image = buttonImage;
+	menu1->button_count = 2;
+
 	main_page.menus[0] = menu1;
 	main_page.menu_count = 1;
 
@@ -225,7 +233,7 @@ ErrCode switchToFreeTrainingPage(){
 	menu1->buttons[0].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
 	menu1->buttons[0].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
 	menu1->buttons[0].event = loadStartPage;
-	menu1->buttons[0].text = "BEENDEN";
+	menu1->buttons[0].text = "Beenden";
 	menu1->buttons[0].image = buttonImage;
 	menu1->button_count = 1;
 

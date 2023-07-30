@@ -300,19 +300,23 @@ ErrCode loadImage(const char* name, Image& image){
 	image.width = std::atoi(word.c_str());
 	file >> word;
 	image.height = std::atoi(word.c_str());
+	int pos = file.tellg();
 	image.data = new(std::nothrow) uint[image.width*image.height];
 	if(!image.data) return BAD_ALLOC;
+	file.close();
+	file.open(name, std::ios::in | std::ios::binary);
+	if(!file.is_open()) return FILE_NOT_FOUND;
+	file.seekg(pos);
+	char val[4];
+	file.read(&val[0], 1);	//Überspringe letztes Leerzeichen
 	for(uint i=0; i < image.width*image.height; ++i){
-		file >> word;
-		BYTE r = std::atoi(word.c_str());
-		file >> word;
-		BYTE g = std::atoi(word.c_str());
-		file >> word;
-		BYTE b = std::atoi(word.c_str());
-		file >> word;
-		BYTE a = std::atoi(word.c_str());
-		image.data[i] = RGBA(r, g, b, a);
+		file.read(&val[0], 1);
+		file.read(&val[1], 1);
+		file.read(&val[2], 1);
+		file.read(&val[3], 1);
+		image.data[i] = RGBA(val[0], val[1], val[2], val[3]);
 	}
+	file.close();
 	return SUCCESS;
 }
 
@@ -372,7 +376,7 @@ ErrCode loadFont(const char* path, Font& font, ivec2 char_size){
 				}
 			}
 		}
-		font.char_sizes[i] = x_max - (i%16)*char_size.x + 8;
+		font.char_sizes[i] = x_max - (i%16)*char_size.x + 10;
 	}
 	return SUCCESS;
 }
