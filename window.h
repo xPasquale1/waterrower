@@ -343,7 +343,8 @@ ErrCode copyImageToWindow(HWND window, Image& image, int start_x, int start_y, i
 				for(int x=start_x; x < end_x; ++x){
 					uint ry = scaled_y*image.height;
 					uint rx = (float)(x-start_x)/(end_x-start_x)*(image.width-1);
-					pixels[y*buffer_width+x] = image.data[ry*image.width+rx];
+					uint color = image.data[ry*image.width+rx];
+					if(A(color) > 0) pixels[y*buffer_width+x] = color;
 				}
 			}
 			return SUCCESS;
@@ -430,7 +431,6 @@ enum BUTTONSTATE{
 	BUTTON_VISIBLE=1, BUTTON_CAN_HOVER=2, BUTTON_HOVER=4, BUTTON_PRESSED=8, BUTTON_TEXT_CENTER
 };
 struct Button{
-	~Button(){}
 	ErrCode (*event)(void) = _defaultEvent;	//Funktionspointer zu einer Funktion die gecallt werden soll wenn der Button gedrückt wird
 	std::string text;
 	Image* image = nullptr;
@@ -444,6 +444,10 @@ struct Button{
 	uint textcolor = RGBA(180, 180, 180);
 	WORD textsize = 16;
 };
+
+void destroyButton(Button& button){
+	delete[] button.image;	//nullptr check sollte nicht nötig sein
+}
 
 inline constexpr bool checkButtonState(Button& button, BUTTONSTATE state){return (button.state&state);}
 //TODO kann bestimmt besser geschrieben werden...
@@ -506,11 +510,6 @@ inline void updateButtons(HWND window, Font& font, Button* buttons, WORD button_
 	drawButtons(window, font, buttons, button_count);
 }
 
-enum MENUSTATE{
-	MENU_OPEN=1, MENU_OPEN_TOGGLE=2
-};
-#define MAX_BUTTONS 10
-#define MAX_STRINGS 20
 //Speichert und zeigt x Buttons und strings an
 struct Label{
 	std::string text;
@@ -519,7 +518,15 @@ struct Label{
 	WORD text_size = 2;
 };
 
+enum MENUSTATE{
+	MENU_OPEN=1, MENU_OPEN_TOGGLE=2
+};
+#define MAX_BUTTONS 10
+#define MAX_STRINGS 20
+#define MAX_IMAGES 5
 struct Menu{
+	Image* images[MAX_IMAGES];
+	WORD image_count = 0;
 	Button buttons[MAX_BUTTONS];
 	WORD button_count = 0;
 	BYTE state = MENU_OPEN;	//Bits: offen, toggle bit für offen, Rest ungenutzt
@@ -527,6 +534,12 @@ struct Menu{
 	Label labels[MAX_STRINGS];
 	WORD label_count = 0;
 };
+
+void destroyMenu(Menu& menu){
+	for(WORD i=0; i < menu.image_count; ++i){
+		delete[] menu.images[i];	//nullptr check sollte nicht nötig sein
+	}
+}
 
 inline constexpr bool checkMenuState(Menu& menu, MENUSTATE state){return (menu.state&state);}
 inline void updateMenu(HWND window, Menu& menu, Font& font){

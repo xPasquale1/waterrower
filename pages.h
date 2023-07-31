@@ -2,21 +2,28 @@
 #include "window.h"
 #include "usb.h"
 
+struct ImageInfo{
+	ivec2 pos = {};
+	ivec2 size = {};
+};
+
 void _default_page_function(void){}
 #define MAX_MENUS 2
 #define MAX_IMAGES 5
 struct Page{
 	Menu* menus[MAX_MENUS];
 	WORD menu_count = 0;
-	Image* images[MAX_IMAGES];	//TODO sollte eigentlich im Menü gespeichert werden
+	Image* images[MAX_IMAGES];
+	ImageInfo imageInfo[MAX_IMAGES];
 	WORD image_count = 0;
-	Font* font = nullptr;		//Sollte auch in Menu sein, vllt?
+	Font* font = nullptr;		//TODO Sollte evtl. auch im Menu sein?
 	void (*code)(void) = _default_page_function;
 };
 
 //Löscht die font nicht!
 void destroyPageNoFont(Page& page){
 	for(WORD i=0; i < page.menu_count; ++i){
+		destroyMenu(*page.menus[i]);
 		delete page.menus[i];
 	}
 	for(WORD i=0; i < page.image_count; ++i){
@@ -46,6 +53,10 @@ void destroyPage(Page& page){
 }
 
 void updatePage(Page& page, HWND window){
+	for(WORD i=0; i < page.image_count; ++i){
+		ImageInfo& info = page.imageInfo[i];
+		copyImageToWindow(window, *page.images[i], info.pos.x, info.pos.y, info.size.x, info.size.y);
+	}
 	for(WORD i=0; i < page.menu_count; ++i){
 		updateMenu(window, *(page.menus[i]), *page.font);
 	}

@@ -180,14 +180,22 @@ ErrCode switchPage(){
 ErrCode switchToStartPage(){
 	destroyPageNoFont(main_page);
 
-	Image* buttonImage = new Image;
-	ErrCheck(loadImage("textures/button.tex", *buttonImage), "button texture laden");
-	main_page.images[0] = buttonImage;
+	Image* backgroundImage = new Image;
+	ErrCheck(loadImage("textures/waterrower.tex", *backgroundImage), "Hintergrund image laden");
+	main_page.images[0] = backgroundImage;
+	main_page.imageInfo[0].pos = {0, 0};
+	main_page.imageInfo[0].size = {400, 400};
 	main_page.image_count = 1;
 
 	Menu* menu1 = new Menu;
 	ivec2 pos = {100, 200};
 	ivec2 size = {160, 40};
+
+	Image* buttonImage = new Image;
+	ErrCheck(loadImage("textures/button.tex", *buttonImage), "button image laden");
+	menu1->images[0] = buttonImage;
+	menu1->image_count = 1;
+
 	menu1->buttons[0].pos = {pos.x, pos.y};
 	menu1->buttons[0].size = {size.x, size.y};
 	menu1->buttons[0].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
@@ -195,6 +203,7 @@ ErrCode switchToStartPage(){
 	menu1->buttons[0].event = loadFreeTrainingPage;
 	menu1->buttons[0].text = "Freies Training";
 	menu1->buttons[0].image = buttonImage;
+	menu1->buttons[0].textsize = 20;
 	menu1->buttons[1].pos = {pos.x, pos.y+size.y+5};
 	menu1->buttons[1].size = {size.x, size.y};
 	menu1->buttons[1].repos = {(int)(pos.x-size.x*0.05), (int)(menu1->buttons[1].pos.y-size.y*0.05)};
@@ -202,6 +211,7 @@ ErrCode switchToStartPage(){
 //	menu1->buttons[1].event = loadFreeTrainingPage;
 	menu1->buttons[1].text = "Cooler Button";
 	menu1->buttons[1].image = buttonImage;
+	menu1->buttons[1].textsize = 20;
 	menu1->button_count = 2;
 
 	main_page.menus[0] = menu1;
@@ -220,14 +230,15 @@ ErrCode switchToStartPage(){
 ErrCode switchToFreeTrainingPage(){
 	destroyPageNoFont(main_page);
 
-	Image* buttonImage = new Image;
-	ErrCheck(loadImage("textures/button.tex", *buttonImage), "button texture laden");
-	main_page.images[0] = buttonImage;
-	main_page.image_count = 1;
-
 	Menu* menu1 = new Menu;
 	ivec2 pos = {50, 350};
 	ivec2 size = {160, 40};
+
+	Image* buttonImage = new Image;
+	ErrCheck(loadImage("textures/button.tex", *buttonImage), "button image laden");
+	menu1->images[0] = buttonImage;
+	menu1->image_count = 1;
+
 	menu1->buttons[0].pos = {pos.x, pos.y};
 	menu1->buttons[0].size = {size.x, size.y};
 	menu1->buttons[0].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
@@ -235,6 +246,7 @@ ErrCode switchToFreeTrainingPage(){
 	menu1->buttons[0].event = loadStartPage;
 	menu1->buttons[0].text = "Beenden";
 	menu1->buttons[0].image = buttonImage;
+	menu1->buttons[0].textsize = 20;
 	menu1->button_count = 1;
 
 	menu1->labels[0].pos = {20, 20};
