@@ -11,8 +11,6 @@ extern "C"{
 
 #define NO_DEVICE
 
-LRESULT CALLBACK basic_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-
 #ifndef NO_DEVICE
 HANDLE hDevice = open_device("\\\\.\\COM6", 19200);
 #endif
@@ -21,14 +19,15 @@ BYTE receiveBuffer[128];
 BYTE sendBuffer[128];
 RequestQueue queue;
 Page main_page;
-BYTE page_switch = 0;	//0 kein wechsel, 1 wechsel zur startseite, 2 free training seite
+BYTE page_select = 0;	//0 Startseite, 1 free training Seite
 Font* default_font = nullptr;
 
-ErrCode loadStartPage(){page_switch = 1; return SUCCESS;};
-ErrCode loadFreeTrainingPage(){page_switch = 2; return SUCCESS;};
-ErrCode switchToStartPage();
+LRESULT CALLBACK main_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+ErrCode loadStartPage(){setPageFlag(main_page, PAGE_LOAD); page_select = 0; return SUCCESS;};
+ErrCode loadFreeTrainingPage(){setPageFlag(main_page, PAGE_LOAD); page_select = 1; return SUCCESS;};
+ErrCode switchToStartPage(HWND window);
 ErrCode switchToFreeTrainingPage();
-ErrCode switchPage();
+ErrCode handleSignals(HWND window);
 void refreshData(RequestQueue& queue, WORD interval=250){
 	static SYSTEMTIME last_request_tp2 = {};
 	SYSTEMTIME systemTime;
@@ -72,7 +71,7 @@ void displayDataPage(){
 
 INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){
 	HWND main_window;
-	ErrCheck(openWindow(hInstance, 800, 800, 2, main_window, "waterrower", basic_window_callback), "open main window");
+	ErrCheck(openWindow(hInstance, 800, 800, 2, main_window, "waterrower", main_window_callback), "open main window");
 
 #ifndef NO_DEVICE
 	init_communication(hDevice, sendBuffer, receiveBuffer);
@@ -90,8 +89,6 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 		updatePage(main_page, main_window);
 
-		switchPage();
-
 		ErrCheck(drawWindow(main_window), "draw window");
 
 #ifndef NO_DEVICE
@@ -102,7 +99,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 			checkCode(receiveBuffer, length);
 		}
 #endif
-		getMessages();	//TODO frägt alle windows ab, könnte evtl nicht nötig sein
+		handleSignals(main_window);
 	}
 
 	//Aufräumen
@@ -116,16 +113,17 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	return 0;
 }
 
-LRESULT CALLBACK basic_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
+LRESULT CALLBACK main_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 	switch(uMsg){
 	case WM_DESTROY:{
-		ErrCheck(setWindowState(hwnd, WINDOW_SHOULD_CLOSE), "set close window state");
+		ErrCheck(setWindowState(hwnd, WINDOW_CLOSE), "setze close Fensterstatus");
 		break;
 	}
 	case WM_SIZE:{
 		UINT width = LOWORD(lParam);
 		UINT height = HIWORD(lParam);
-		ErrCheck(resizeWindow(hwnd, width, height, 2));
+		ErrCheck(setWindowState(hwnd, WINDOW_RESIZE), "setzte resize Fensterstatus");
+		ErrCheck(resizeWindow(hwnd, width, height, 2), "Fenster skalieren");
         break;
 	}
 	case WM_LBUTTONDOWN:{
@@ -163,39 +161,63 @@ LRESULT CALLBACK basic_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPAR
 	return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-ErrCode switchPage(){
-	switch(page_switch){
-	case 1:
-		switchToStartPage();
-		page_switch = 0;
-		break;
-	case 2:
-		switchToFreeTrainingPage();
-		page_switch = 0;
-		break;
+ErrCode handleSignals(HWND window){
+	getMessages();
+	for(WORD i=0; i < app.window_count; ++i){
+		HWND windowIter = app.windows[i];
+		WINDOWSTATE state;
+		while((state = getNextWindowState(windowIter))){
+			switch(state){
+			case WINDOW_CLOSE:
+				closeWindow(windowIter);
+				break;
+			case WINDOW_RESIZE:
+				setPageFlag(main_page, PAGE_LOAD);
+				break;
+			}
+		}
+	}
+	PAGEFLAGSTYPE flag;
+	while((flag = getNextPageFlag(main_page))){
+		switch(flag){
+		case PAGE_LOAD:
+			switch(page_select){
+			case 0:
+				switchToStartPage(window);
+				break;
+			case 1:
+				switchToFreeTrainingPage();
+				break;
+			}
+			break;
+		}
 	}
 	return SUCCESS;
 }
 
-ErrCode switchToStartPage(){
+ErrCode switchToStartPage(HWND window){
 	destroyPageNoFont(main_page);
+
+	WORD idx;
+	ErrCheck(getWindow(window, idx));
+	WindowInfo& windowInfo = app.info[idx];
 
 	Image* backgroundImage = new Image;
 	ErrCheck(loadImage("textures/waterrower.tex", *backgroundImage), "Hintergrund image laden");
 	main_page.images[0] = backgroundImage;
 	main_page.imageInfo[0].pos = {0, 0};
-	main_page.imageInfo[0].size = {400, 400};
+	main_page.imageInfo[0].size = {windowInfo.window_width/windowInfo.pixel_size, windowInfo.window_height/windowInfo.pixel_size};
 	main_page.image_count = 1;
 
 	Menu* menu1 = new Menu;
-	ivec2 pos = {100, 200};
-	ivec2 size = {160, 40};
 
 	Image* buttonImage = new Image;
 	ErrCheck(loadImage("textures/button.tex", *buttonImage), "button image laden");
 	menu1->images[0] = buttonImage;
 	menu1->image_count = 1;
 
+	ivec2 pos = {50, 50};
+	ivec2 size = {(int)(windowInfo.window_width/windowInfo.pixel_size*0.4), (int)(windowInfo.window_height/windowInfo.pixel_size*0.1)};
 	menu1->buttons[0].pos = {pos.x, pos.y};
 	menu1->buttons[0].size = {size.x, size.y};
 	menu1->buttons[0].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
@@ -203,7 +225,7 @@ ErrCode switchToStartPage(){
 	menu1->buttons[0].event = loadFreeTrainingPage;
 	menu1->buttons[0].text = "Freies Training";
 	menu1->buttons[0].image = buttonImage;
-	menu1->buttons[0].textsize = 20;
+	menu1->buttons[0].textsize = size.y/2;
 	menu1->buttons[1].pos = {pos.x, pos.y+size.y+5};
 	menu1->buttons[1].size = {size.x, size.y};
 	menu1->buttons[1].repos = {(int)(pos.x-size.x*0.05), (int)(menu1->buttons[1].pos.y-size.y*0.05)};
@@ -211,7 +233,7 @@ ErrCode switchToStartPage(){
 //	menu1->buttons[1].event = loadFreeTrainingPage;
 	menu1->buttons[1].text = "Cooler Button";
 	menu1->buttons[1].image = buttonImage;
-	menu1->buttons[1].textsize = 20;
+	menu1->buttons[1].textsize = size.y/2;
 	menu1->button_count = 2;
 
 	main_page.menus[0] = menu1;

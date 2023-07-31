@@ -4,7 +4,7 @@
 #include <math.h>
 
 typedef unsigned char BYTE;
-typedef unsigned int uint;
+typedef unsigned long uint;
 
 struct ivec2{
 	int x;
@@ -29,7 +29,7 @@ enum ErrCodeFlags{
 	ERR_ON_FATAL
 };
 //TODO ERR_ON_FATAL ausgeben können wenn der nutzer es so möchte
-inline constexpr ErrCode ErrCheck(ErrCode code, const char* msg="\0", ErrCodeFlags flags=NO_ERR_FLAG){
+inline constexpr ErrCode ErrCheck(ErrCode code, const char* msg="\0", ErrCodeFlags flags=NO_ERR_OUTPUT){
 	switch(code){
 	case BAD_ALLOC:
 		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[BAD_ALLOC ERROR] " << msg << std::endl;

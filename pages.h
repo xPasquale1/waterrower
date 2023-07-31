@@ -7,10 +7,15 @@ struct ImageInfo{
 	ivec2 size = {};
 };
 
+#define PAGEFLAGSTYPE unsigned char
+enum PAGEFLAGS : PAGEFLAGSTYPE{
+	PAGE_LOAD=1
+};
 void _default_page_function(void){}
 #define MAX_MENUS 2
 #define MAX_IMAGES 5
 struct Page{
+	PAGEFLAGSTYPE flags;
 	Menu* menus[MAX_MENUS];
 	WORD menu_count = 0;
 	Image* images[MAX_IMAGES];
@@ -19,6 +24,18 @@ struct Page{
 	Font* font = nullptr;		//TODO Sollte evtl. auch im Menu sein?
 	void (*code)(void) = _default_page_function;
 };
+
+constexpr inline void setPageFlag(Page& page, PAGEFLAGS flag){page.flags |= flag;}
+constexpr inline void resetPageFlag(Page& page, PAGEFLAGS flag){page.flags &= ~flag;}
+constexpr inline bool getPageFlag(Page& page, PAGEFLAGS flag){return page.flags & flag;}
+
+//Gibts das nächste gesetzt Flag zurück
+//Nutzen könnte while(getNextPageFlag())... sein
+constexpr inline PAGEFLAGS getNextPageFlag(Page& page){
+	PAGEFLAGSTYPE flag = page.flags & -page.flags;
+	resetPageFlag(page, (PAGEFLAGS)flag);
+	return (PAGEFLAGS)flag;
+}
 
 //Löscht die font nicht!
 void destroyPageNoFont(Page& page){

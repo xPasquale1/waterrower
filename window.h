@@ -6,18 +6,18 @@
 
 #include "util.h"
 
-enum WINDOWSTATE{
-	WINDOW_SHOULD_CLOSE = 1,
+#define WINDOWSTATETYPE BYTE
+enum WINDOWSTATE : WINDOWSTATETYPE{
+	WINDOW_CLOSE = 1,
 	WINDOW_RESIZE = 2
 };
 struct WindowInfo{
 	WORD window_width = 800;
 	WORD window_height = 800;
 	WORD pixel_size = 1;
-	BYTE state = 0;	//WINDOWSTATE für mehr Informationen
-	WORD data[3];	//Zusätzliche Daten bei state changes können hier gespeichert werden
+	WINDOWSTATETYPE state;			//Zustand des Fensters (können mehrere sein)
 };
-#define MAX_WINDOW_COUNT 20
+#define MAX_WINDOW_COUNT 10
 struct Application{
 	HWND windows[MAX_WINDOW_COUNT];		//Fenster handles der app
 	WindowInfo info[MAX_WINDOW_COUNT];	//Fensterinfos
@@ -25,37 +25,6 @@ struct Application{
 	WORD window_count = 0;				//Anzahl der Fenster
 	BITMAPINFO bitmapInfo = {};			//TODO eigentlich ist das für jedes Fenster gleich, von daher braucht man kein array
 }; static Application app;
-
-inline ErrCode setWindowState(HWND window, WINDOWSTATE state){
-	for(WORD i=0; i < app.window_count; ++i){
-		if(app.windows[i] == window){
-			app.info[i].state |= state;
-			return SUCCESS;
-		}
-	}
-	return WINDOW_NOT_FOUND;
-}
-
-inline ErrCode resetWindowState(HWND window, WINDOWSTATE state){
-	for(WORD i=0; i < app.window_count; ++i){
-		if(app.windows[i] == window){
-			app.info[i].state &= ~state;
-			return SUCCESS;
-		}
-	}
-	return WINDOW_NOT_FOUND;
-}
-
-//TODO schlecht gelöst, sollte auch Fehlercodes zurückgeben
-inline bool getWindowState(HWND window, WINDOWSTATE state){
-	for(WORD i=0; i < app.window_count; ++i){
-		if(app.windows[i] == window){
-			return (app.info[i].state & state);
-		}
-		return false;
-	}
-	return true;
-}
 
 inline ErrCode getWindow(HWND window, WORD& index){
 	for(WORD i=0; i < app.window_count; ++i){
@@ -65,6 +34,39 @@ inline ErrCode getWindow(HWND window, WORD& index){
 		}
 	}
 	return WINDOW_NOT_FOUND;
+}
+
+inline ErrCode setWindowState(HWND window, WINDOWSTATE state){
+	ErrCode code; WORD idx;
+	code = getWindow(window, idx);
+	if(code) return code;
+	app.info[idx].state |= state;
+	return SUCCESS;
+}
+
+inline ErrCode resetWindowState(HWND window, WINDOWSTATE state){
+	ErrCode code; WORD idx;
+	code = getWindow(window, idx);
+	if(code) return code;
+	app.info[idx].state &= ~state;
+	return SUCCESS;
+}
+
+//TODO Fehler melden
+inline bool getWindowState(HWND window, WINDOWSTATE state){
+	WORD idx;
+	getWindow(window, idx);
+	return (app.info[idx].state & state);
+}
+
+//TODO Fehler melden
+//Gibt den nächsten Zustand des Fensters zurück, Anwendung z.B. while(getNextWindowState())...
+inline WINDOWSTATE getNextWindowState(HWND window){
+	WORD idx;
+	getWindow(window, idx);
+	WINDOWSTATETYPE state = app.info[idx].state & -app.info[idx].state;
+	app.info[idx].state &= ~state;
+	return (WINDOWSTATE)state;
 }
 
 inline ErrCode resizeWindow(HWND window, WORD width, WORD height, WORD pixel_size){
@@ -82,48 +84,7 @@ inline ErrCode resizeWindow(HWND window, WORD width, WORD height, WORD pixel_siz
 }
 
 typedef LRESULT (*window_callback_function)(HWND, UINT, WPARAM, LPARAM);
-
-LRESULT CALLBACK default_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
-	switch(uMsg){
-	case WM_DESTROY:{
-		ErrCheck(setWindowState(hwnd, WINDOW_SHOULD_CLOSE), "set close window state");
-		break;
-	}
-	case WM_SIZE:{
-		UINT width = LOWORD(lParam);
-		UINT height = HIWORD(lParam);
-		ErrCheck(resizeWindow(hwnd, width, height, 2));
-        break;
-	}
-	case WM_LBUTTONDOWN:{
-		setButton(mouse, MOUSE_LMB);
-		break;
-	}
-	case WM_LBUTTONUP:{
-		resetButton(mouse, MOUSE_LMB);
-		break;
-	}
-	case WM_RBUTTONDOWN:{
-		setButton(mouse, MOUSE_RMB);
-		break;
-	}
-	case WM_RBUTTONUP:{
-		resetButton(mouse, MOUSE_RMB);
-		break;
-	}
-	case WM_MOUSEMOVE:{
-		for(WORD i=0; i < app.window_count; ++i){
-			if(app.windows[i] == hwnd){
-				mouse.pos.x = GET_X_LPARAM(lParam)/app.info[i].pixel_size;
-				mouse.pos.y = GET_Y_LPARAM(lParam)/app.info[i].pixel_size;
-			}
-		}
-		break;
-	}
-	}
-	return DefWindowProc(hwnd, uMsg, wParam, lParam);
-}
-
+LRESULT CALLBACK default_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 //Setzt bei Erfolg den Parameter window zu einem gültigen window handle, auf welches man das zugreifen kann
 ErrCode openWindow(HINSTANCE hInstance, LONG window_width, LONG window_height, WORD pixel_size, HWND& window, const char* name = "Window", window_callback_function callback = default_window_callback){
 	//Erstelle Fenster Klasse
@@ -180,25 +141,52 @@ ErrCode closeWindow(HWND window){
 	return WINDOW_NOT_FOUND;
 }
 
+LRESULT CALLBACK default_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
+	switch(uMsg){
+	case WM_DESTROY:{
+		ErrCheck(closeWindow(hwnd), "schließe Fenster");
+		break;
+	}
+	case WM_SIZE:{
+		UINT width = LOWORD(lParam);
+		UINT height = HIWORD(lParam);
+		ErrCheck(resizeWindow(hwnd, width, height, 2));
+        break;
+	}
+	case WM_LBUTTONDOWN:{
+		setButton(mouse, MOUSE_LMB);
+		break;
+	}
+	case WM_LBUTTONUP:{
+		resetButton(mouse, MOUSE_LMB);
+		break;
+	}
+	case WM_RBUTTONDOWN:{
+		setButton(mouse, MOUSE_RMB);
+		break;
+	}
+	case WM_RBUTTONUP:{
+		resetButton(mouse, MOUSE_RMB);
+		break;
+	}
+	case WM_MOUSEMOVE:{
+		for(WORD i=0; i < app.window_count; ++i){
+			if(app.windows[i] == hwnd){
+				mouse.pos.x = GET_X_LPARAM(lParam)/app.info[i].pixel_size;
+				mouse.pos.y = GET_Y_LPARAM(lParam)/app.info[i].pixel_size;
+			}
+		}
+		break;
+	}
+	}
+	return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
+
 inline void getMessages()noexcept{
 	MSG msg;
 	for(WORD i=0; i < app.window_count; ++i){
-		if(getWindowState(app.windows[i], WINDOW_SHOULD_CLOSE)){
-			closeWindow(app.windows[i]);
-			break;
-		}
-		if(getWindowState(app.windows[i], WINDOW_RESIZE)){
-			std::cout << "resize" << std::endl;
-			WORD new_width = app.info[i].data[0];
-			WORD new_height = app.info[i].data[1];
-			app.info[i].window_width = new_width;
-			app.info[i].window_height = new_height;
-			delete[] app.pixels[i];
-			app.pixels[i] = new uint[new_width/app.info[i].pixel_size*new_height/app.info[i].pixel_size];
-			resetWindowState(app.windows[i], WINDOW_RESIZE);
-			break;
-		}
-		while(PeekMessage(&msg, app.windows[i], 0, 0, PM_REMOVE)){
+		HWND window = app.windows[i];
+		while(PeekMessage(&msg, window, 0, 0, PM_REMOVE)){
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
