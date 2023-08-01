@@ -11,7 +11,7 @@ struct ImageInfo{
 enum PAGEFLAGS : PAGEFLAGSTYPE{
 	PAGE_LOAD=1
 };
-void _default_page_function(void){}
+void _default_page_function(HWND){}
 #define MAX_MENUS 2
 #define MAX_IMAGES 5
 struct Page{
@@ -22,7 +22,7 @@ struct Page{
 	ImageInfo imageInfo[MAX_IMAGES];
 	WORD image_count = 0;
 	Font* font = nullptr;		//TODO Sollte evtl. auch im Menu sein?
-	void (*code)(void) = _default_page_function;
+	void (*code)(HWND) = _default_page_function;
 };
 
 constexpr inline void setPageFlag(Page& page, PAGEFLAGS flag){page.flags |= flag;}
@@ -77,5 +77,5 @@ void updatePage(Page& page, HWND window){
 	for(WORD i=0; i < page.menu_count; ++i){
 		updateMenu(window, *(page.menus[i]), *page.font);
 	}
-	page.code();
+	page.code(window);
 }

@@ -8,6 +8,7 @@ extern "C"{
 #include "window.h"
 #include "usb.h"
 #include "pages.h"
+#include "graphs.h"
 
 #define NO_DEVICE
 
@@ -25,8 +26,10 @@ Font* default_font = nullptr;
 LRESULT CALLBACK main_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 ErrCode loadStartPage(){setPageFlag(main_page, PAGE_LOAD); page_select = 0; return SUCCESS;};
 ErrCode loadFreeTrainingPage(){setPageFlag(main_page, PAGE_LOAD); page_select = 1; return SUCCESS;};
+ErrCode loadStatistikPage(){setPageFlag(main_page, PAGE_LOAD); page_select = 2; return SUCCESS;};
 ErrCode switchToStartPage(HWND window);
-ErrCode switchToFreeTrainingPage();
+ErrCode switchToFreeTrainingPage(HWND window);
+ErrCode switchToStatistikPage(HWND window);
 ErrCode handleSignals(HWND window);
 void refreshData(RequestQueue& queue, WORD interval=250){
 	static SYSTEMTIME last_request_tp2 = {};
@@ -54,7 +57,7 @@ void refreshData(RequestQueue& queue, WORD interval=250){
 	}
 }
 
-void displayDataPage(){
+void displayDataPage(HWND window){
 #ifndef NO_DEVICE
 		refreshData(queue, 250);
 #endif
@@ -67,6 +70,11 @@ void displayDataPage(){
 	}
 	main_page.menus[0]->labels[2].text = "Durchschnittlich: " + float_to_string(avg_ms) + "m/s";
 	main_page.menus[0]->labels[3].text = "Zeit: " + std::to_string(rowingData.hrs) + ':' + std::to_string(rowingData.min) + ':' + std::to_string(rowingData.sec);
+}
+
+void displayStatistics(HWND window){
+	DataPoint dps[] = {{1, 2}, {2, 3}, {4, 4}, {5, 3}, {6, 3}}; WORD dps_count = 5;
+	ErrCheck(drawGraph(window, 50, 50, 250, 250, dps, dps_count));
 }
 
 INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){
@@ -186,7 +194,10 @@ ErrCode handleSignals(HWND window){
 				switchToStartPage(window);
 				break;
 			case 1:
-				switchToFreeTrainingPage();
+				switchToFreeTrainingPage(window);
+				break;
+			case 2:
+				switchToStatistikPage(window);
 				break;
 			}
 			break;
@@ -216,8 +227,8 @@ ErrCode switchToStartPage(HWND window){
 	menu1->images[0] = buttonImage;
 	menu1->image_count = 1;
 
-	ivec2 pos = {50, 50};
-	ivec2 size = {(int)(windowInfo.window_width/windowInfo.pixel_size*0.4), (int)(windowInfo.window_height/windowInfo.pixel_size*0.1)};
+	ivec2 pos = {(int)(windowInfo.window_width/windowInfo.pixel_size*0.125), (int)(windowInfo.window_height/windowInfo.pixel_size*0.125)};
+	ivec2 size = {(int)(windowInfo.window_height/windowInfo.pixel_size*0.1)*4, (int)(windowInfo.window_height/windowInfo.pixel_size*0.1)};
 	menu1->buttons[0].pos = {pos.x, pos.y};
 	menu1->buttons[0].size = {size.x, size.y};
 	menu1->buttons[0].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
@@ -226,12 +237,12 @@ ErrCode switchToStartPage(HWND window){
 	menu1->buttons[0].text = "Freies Training";
 	menu1->buttons[0].image = buttonImage;
 	menu1->buttons[0].textsize = size.y/2;
-	menu1->buttons[1].pos = {pos.x, pos.y+size.y+5};
+	menu1->buttons[1].pos = {pos.x, pos.y+size.y+(int)(windowInfo.window_height/windowInfo.pixel_size*0.0125)};
 	menu1->buttons[1].size = {size.x, size.y};
 	menu1->buttons[1].repos = {(int)(pos.x-size.x*0.05), (int)(menu1->buttons[1].pos.y-size.y*0.05)};
 	menu1->buttons[1].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
-//	menu1->buttons[1].event = loadFreeTrainingPage;
-	menu1->buttons[1].text = "Cooler Button";
+	menu1->buttons[1].event = loadStatistikPage;
+	menu1->buttons[1].text = "Statistiken";
 	menu1->buttons[1].image = buttonImage;
 	menu1->buttons[1].textsize = size.y/2;
 	menu1->button_count = 2;
@@ -249,18 +260,22 @@ ErrCode switchToStartPage(HWND window){
 	return SUCCESS;
 }
 
-ErrCode switchToFreeTrainingPage(){
+ErrCode switchToFreeTrainingPage(HWND window){
 	destroyPageNoFont(main_page);
 
+	WORD idx;
+	ErrCheck(getWindow(window, idx));
+	WindowInfo& windowInfo = app.info[idx];
+
 	Menu* menu1 = new Menu;
-	ivec2 pos = {50, 350};
-	ivec2 size = {160, 40};
 
 	Image* buttonImage = new Image;
 	ErrCheck(loadImage("textures/button.tex", *buttonImage), "button image laden");
 	menu1->images[0] = buttonImage;
 	menu1->image_count = 1;
 
+	ivec2 pos = {(int)(windowInfo.window_width/windowInfo.pixel_size*0.125), windowInfo.window_height/windowInfo.pixel_size-(int)(windowInfo.window_height/windowInfo.pixel_size*0.2)};
+	ivec2 size = {(int)(windowInfo.window_height/windowInfo.pixel_size*0.1)*4, (int)(windowInfo.window_height/windowInfo.pixel_size*0.1)};
 	menu1->buttons[0].pos = {pos.x, pos.y};
 	menu1->buttons[0].size = {size.x, size.y};
 	menu1->buttons[0].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
@@ -268,7 +283,7 @@ ErrCode switchToFreeTrainingPage(){
 	menu1->buttons[0].event = loadStartPage;
 	menu1->buttons[0].text = "Beenden";
 	menu1->buttons[0].image = buttonImage;
-	menu1->buttons[0].textsize = 20;
+	menu1->buttons[0].textsize = size.y/2;
 	menu1->button_count = 1;
 
 	menu1->labels[0].pos = {20, 20};
@@ -285,6 +300,40 @@ ErrCode switchToFreeTrainingPage(){
 	main_page.menu_count = 1;
 
 	main_page.code = displayDataPage;
+
+	return SUCCESS;
+}
+
+ErrCode switchToStatistikPage(HWND window){
+	destroyPageNoFont(main_page);
+
+	WORD idx;
+	ErrCheck(getWindow(window, idx));
+	WindowInfo& windowInfo = app.info[idx];
+
+	Menu* menu1 = new Menu;
+
+	Image* buttonImage = new Image;
+	ErrCheck(loadImage("textures/button.tex", *buttonImage), "button image laden");
+	menu1->images[0] = buttonImage;
+	menu1->image_count = 1;
+
+	ivec2 pos = {(int)(windowInfo.window_width/windowInfo.pixel_size*0.125), windowInfo.window_height/windowInfo.pixel_size-(int)(windowInfo.window_height/windowInfo.pixel_size*0.2)};
+	ivec2 size = {(int)(windowInfo.window_height/windowInfo.pixel_size*0.1)*4, (int)(windowInfo.window_height/windowInfo.pixel_size*0.1)};
+	menu1->buttons[0].pos = {pos.x, pos.y};
+	menu1->buttons[0].size = {size.x, size.y};
+	menu1->buttons[0].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
+	menu1->buttons[0].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
+	menu1->buttons[0].event = loadStartPage;
+	menu1->buttons[0].text = "Startbildschirm";
+	menu1->buttons[0].image = buttonImage;
+	menu1->buttons[0].textsize = size.y/2;
+	menu1->button_count = 1;
+
+	main_page.menus[0] = menu1;
+	main_page.menu_count = 1;
+
+	main_page.code = displayStatistics;
 
 	return SUCCESS;
 }

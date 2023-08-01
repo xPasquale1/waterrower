@@ -86,7 +86,7 @@ inline ErrCode resizeWindow(HWND window, WORD width, WORD height, WORD pixel_siz
 typedef LRESULT (*window_callback_function)(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK default_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 //Setzt bei Erfolg den Parameter window zu einem gültigen window handle, auf welches man das zugreifen kann
-ErrCode openWindow(HINSTANCE hInstance, LONG window_width, LONG window_height, WORD pixel_size, HWND& window, const char* name = "Window", window_callback_function callback = default_window_callback){
+ErrCode openWindow(HINSTANCE hInstance, LONG window_width, LONG window_height, WORD pixel_size, HWND& window, const char* name = "Window", window_callback_function callback = default_window_callback, HWND parentWindow = NULL){
 	//Erstelle Fenster Klasse
 	if(app.window_count >= MAX_WINDOW_COUNT) return TOO_MANY_WINDOWS;
 	WNDCLASS window_class = {};
@@ -107,7 +107,7 @@ ErrCode openWindow(HINSTANCE hInstance, LONG window_width, LONG window_height, W
 	uint h = rect.bottom - rect.top;
 
 	//Erstelle das Fenster	//TODO x und y offset angeben können
-	app.windows[app.window_count] = CreateWindow(window_class.lpszClassName, name, WS_VISIBLE | WS_OVERLAPPEDWINDOW, 0, 0, w, h, NULL, NULL, hInstance, NULL);
+	app.windows[app.window_count] = CreateWindow(window_class.lpszClassName, name, WS_VISIBLE | WS_OVERLAPPEDWINDOW, 0, 0, w, h, parentWindow, NULL, hInstance, NULL);
 	window = app.windows[app.window_count];
 
 	//Bitmap-Info	//TODO muss eigentlich nicht immer neu beschrieben werden, da es ja nur eins gibt...
@@ -271,6 +271,57 @@ inline ErrCode drawRectangle(HWND window, uint x, uint y, uint dx, uint dy, uint
 		}
 	}
 	return WINDOW_NOT_FOUND;
+}
+
+inline void drawRectangle(WORD idx, uint x, uint y, uint dx, uint dy, uint color)noexcept{
+	uint buffer_width = app.info[idx].window_width/app.info[idx].pixel_size;
+	uint* pixels = app.pixels[idx];
+	for(uint i=y; i < y+dy; ++i){
+		for(uint j=x; j < x+dx; ++j){
+			pixels[i*buffer_width+j] = color;
+		}
+	}
+}
+
+inline ErrCode drawLine(HWND window, WORD start_x, WORD start_y, WORD end_x, WORD end_y, uint color)noexcept{
+	for(WORD i=0; i < app.window_count; ++i){
+		if(app.windows[i] == window){
+			uint buffer_width = app.info[i].window_width/app.info[i].pixel_size;
+			uint* pixels = app.pixels[i];
+		    int dx = end_x-start_x;
+		    int dy = end_y-start_y;
+		    int steps = abs(dx) > abs(dy) ? abs(dx) : abs(dy);
+		    float xinc = dx/(float)steps;
+		    float yinc = dy/(float)steps;
+		    float x = start_x;
+		    float y = start_y;
+		    for(int i = 0; i <= steps; ++i){
+		    	pixels[(int)y*buffer_width+(int)x] = color;
+		        x += xinc;
+		        y += yinc;
+		    }
+			return SUCCESS;
+		}
+	}
+	return WINDOW_NOT_FOUND;
+}
+
+//idx ist der window index
+inline void drawLine(WORD idx, WORD start_x, WORD start_y, WORD end_x, WORD end_y, uint color)noexcept{
+	uint buffer_width = app.info[idx].window_width/app.info[idx].pixel_size;
+	uint* pixels = app.pixels[idx];
+	int dx = end_x-start_x;
+	int dy = end_y-start_y;
+	int steps = abs(dx) > abs(dy) ? abs(dx) : abs(dy);
+	float xinc = dx/(float)steps;
+	float yinc = dy/(float)steps;
+	float x = start_x;
+	float y = start_y;
+	for(int i = 0; i <= steps; ++i){
+		pixels[(int)y*buffer_width+(int)x] = color;
+		x += xinc;
+		y += yinc;
+	}
 }
 
 struct Image{
