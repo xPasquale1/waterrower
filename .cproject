@@ -41,7 +41,6 @@
 									<listOptionValue builtIn="false" value="winusb"/>
 									<listOptionValue builtIn="false" value="gdi32"/>
 									<listOptionValue builtIn="false" value="hid"/>
-									<listOptionValue builtIn="false" value="setupapi"/>
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="true" id="gnu.cpp.link.option.paths.1469931462" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" useByScannerDiscovery="false" valueType="libPaths"/>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.1996809344" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">

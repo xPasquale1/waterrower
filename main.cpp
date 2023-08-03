@@ -7,29 +7,40 @@ extern "C"{
 #include <thread>
 #include "window.h"
 #include "usb.h"
-#include "pages.h"
+#include "page.h"
 #include "graphs.h"
+#include "workout.h"
 
 #define NO_DEVICE
 
 #ifndef NO_DEVICE
 HANDLE hDevice = open_device("\\\\.\\COM6", 19200);
 #endif
-//TODO Ein paar Dinge hier sollten bei Zeit mal vom Stack runter, nicht das hier Böses passiert
 BYTE receiveBuffer[128];
 BYTE sendBuffer[128];
 RequestQueue queue;
 Page main_page;
 BYTE page_select = 0;	//0 Startseite, 1 free training Seite
 Font* default_font = nullptr;
+//Workouts
+Workout* workout = nullptr;
 
 LRESULT CALLBACK main_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-ErrCode loadStartPage(){setPageFlag(main_page, PAGE_LOAD); page_select = 0; return SUCCESS;};
-ErrCode loadFreeTrainingPage(){setPageFlag(main_page, PAGE_LOAD); page_select = 1; return SUCCESS;};
-ErrCode loadStatistikPage(){setPageFlag(main_page, PAGE_LOAD); page_select = 2; return SUCCESS;};
+ErrCode loadStartPage(){setPageFlag(main_page, PAGE_LOAD); page_select = 0; return SUCCESS;}
+ErrCode loadFreeTrainingPage(){setPageFlag(main_page, PAGE_LOAD); page_select = 1; return SUCCESS;}
+ErrCode loadStatistikPage(){setPageFlag(main_page, PAGE_LOAD); page_select = 2; return SUCCESS;}
+ErrCode loadWorkoutCreatePage(){setPageFlag(main_page, PAGE_LOAD); page_select = 3; return SUCCESS;}
+ErrCode loadWorkoutPage(){
+	setPageFlag(main_page, PAGE_LOAD);
+	page_select = 4;
+	initWorkout(*workout);
+	return SUCCESS;
+}
 ErrCode switchToStartPage(HWND window);
 ErrCode switchToFreeTrainingPage(HWND window);
 ErrCode switchToStatistikPage(HWND window);
+ErrCode switchToCreateWorkoutPage(HWND window);
+ErrCode switchToWorkoutPage(HWND window);
 ErrCode handleSignals(HWND window);
 void refreshData(RequestQueue& queue, WORD interval=250){
 	static SYSTEMTIME last_request_tp2 = {};
@@ -73,13 +84,17 @@ void displayDataPage(HWND window){
 }
 
 void displayStatistics(HWND window){
-	DataPoint dps[] = {{1, 2}, {2, 3}, {4, 4}, {5, 3}, {6, 3}}; WORD dps_count = 5;
-	ErrCheck(drawGraph(window, 50, 50, 250, 250, dps, dps_count));
+	DataPoint dps[] = {{1, 234}, {2, 313}, {4, 284}, {5, 323}, {6, 274}, {7, 198}, {8, 244}, {9, 302}}; WORD dps_count = 8;
+	WORD idx;
+	ErrCheck(getWindow(window, idx));
+	WORD width = app.info[idx].window_width/app.info[idx].pixel_size;
+	WORD height = app.info[idx].window_height/app.info[idx].pixel_size;
+	ErrCheck(drawGraph(window, *default_font, width/2-width*0.625/2, height*0.0625, width*0.625, height*0.625, dps, dps_count));
 }
 
 INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){
 	HWND main_window;
-	ErrCheck(openWindow(hInstance, 800, 800, 2, main_window, "waterrower", main_window_callback), "open main window");
+	ErrCheck(openWindow(hInstance, 800, 800, 1, main_window, "waterrower", main_window_callback), "open main window");
 
 #ifndef NO_DEVICE
 	init_communication(hDevice, sendBuffer, receiveBuffer);
@@ -131,7 +146,7 @@ LRESULT CALLBACK main_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARA
 		UINT width = LOWORD(lParam);
 		UINT height = HIWORD(lParam);
 		ErrCheck(setWindowState(hwnd, WINDOW_RESIZE), "setzte resize Fensterstatus");
-		ErrCheck(resizeWindow(hwnd, width, height, 2), "Fenster skalieren");
+		ErrCheck(resizeWindow(hwnd, width, height, 1), "Fenster skalieren");
         break;
 	}
 	case WM_LBUTTONDOWN:{
@@ -164,6 +179,12 @@ LRESULT CALLBACK main_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARA
 			}
 		}
 		break;
+	}
+	case WM_KEYDOWN:{
+		switch(wParam){
+		case 0:
+			break;
+		}
 	}
 	}
 	return DefWindowProc(hwnd, uMsg, wParam, lParam);
@@ -199,8 +220,13 @@ ErrCode handleSignals(HWND window){
 			case 2:
 				switchToStatistikPage(window);
 				break;
+			case 3:
+				switchToCreateWorkoutPage(window);
+				break;
+			case 4:
+				switchToWorkoutPage(window);
+				break;
 			}
-			break;
 		}
 	}
 	return SUCCESS;
@@ -208,6 +234,7 @@ ErrCode handleSignals(HWND window){
 
 ErrCode switchToStartPage(HWND window){
 	destroyPageNoFont(main_page);
+	destroyWorkout(workout);
 
 	WORD idx;
 	ErrCheck(getWindow(window, idx));
@@ -245,7 +272,15 @@ ErrCode switchToStartPage(HWND window){
 	menu1->buttons[1].text = "Statistiken";
 	menu1->buttons[1].image = buttonImage;
 	menu1->buttons[1].textsize = size.y/2;
-	menu1->button_count = 2;
+	menu1->buttons[2].pos = {pos.x, pos.y+size.y*2+(int)(windowInfo.window_height/windowInfo.pixel_size*0.0125*2)};
+	menu1->buttons[2].size = {size.x, size.y};
+	menu1->buttons[2].repos = {(int)(pos.x-size.x*0.05), (int)(menu1->buttons[2].pos.y-size.y*0.05)};
+	menu1->buttons[2].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
+	menu1->buttons[2].event = loadWorkoutCreatePage;
+	menu1->buttons[2].text = "Workouts";
+	menu1->buttons[2].image = buttonImage;
+	menu1->buttons[2].textsize = size.y/2;
+	menu1->button_count = 3;
 
 	main_page.menus[0] = menu1;
 	main_page.menu_count = 1;
@@ -286,14 +321,16 @@ ErrCode switchToFreeTrainingPage(HWND window){
 	menu1->buttons[0].textsize = size.y/2;
 	menu1->button_count = 1;
 
+	WORD w = windowInfo.window_width/windowInfo.pixel_size;
+	WORD label_text_size = w*0.0775;
 	menu1->labels[0].pos = {20, 20};
-	menu1->labels[0].text_size = 31;
-	menu1->labels[1].pos = {20, 56};
-	menu1->labels[1].text_size = 31;
-	menu1->labels[2].pos = {20, 92};
-	menu1->labels[2].text_size = 31;
-	menu1->labels[3].pos = {20, 128};
-	menu1->labels[3].text_size = 31;
+	menu1->labels[0].text_size = label_text_size;
+	menu1->labels[1].pos = {20, 20+label_text_size+(WORD)(label_text_size*0.16)};
+	menu1->labels[1].text_size = label_text_size;
+	menu1->labels[2].pos = {20, 20+label_text_size*2+(WORD)(label_text_size*0.16*2)};
+	menu1->labels[2].text_size = label_text_size;
+	menu1->labels[3].pos = {20, 20+label_text_size*3+(WORD)(label_text_size*0.16*3)};
+	menu1->labels[3].text_size = label_text_size;
 	menu1->label_count = 4;
 
 	main_page.menus[0] = menu1;
@@ -334,6 +371,154 @@ ErrCode switchToStatistikPage(HWND window){
 	main_page.menu_count = 1;
 
 	main_page.code = displayStatistics;
+
+	return SUCCESS;
+}
+
+ErrCode incWorkoutTime(){
+	workout->duration += 60;
+	main_page.menus[0]->labels[0].text = "Dauer: " + std::to_string(workout->duration/60) + "min";
+	return SUCCESS;
+}
+ErrCode decWorkoutTime(){
+	if(workout->duration > 0) workout->duration -= 60;
+	main_page.menus[0]->labels[0].text = "Dauer: " + std::to_string(workout->duration/60) + "min";
+	return SUCCESS;
+}
+ErrCode switchToCreateWorkoutPage(HWND window){
+	destroyPageNoFont(main_page);
+	destroyWorkout(workout);
+	createWorkout(workout);
+
+	WORD idx;
+	ErrCheck(getWindow(window, idx));
+	WindowInfo& windowInfo = app.info[idx];
+
+	Menu* menu1 = new Menu;
+
+	Image* buttonImage = new Image;
+	ErrCheck(loadImage("textures/button.tex", *buttonImage), "button image laden");
+	menu1->images[0] = buttonImage;
+	menu1->image_count = 1;
+
+	ivec2 pos = {(int)(windowInfo.window_width/windowInfo.pixel_size*0.125), windowInfo.window_height/windowInfo.pixel_size-(int)(windowInfo.window_height/windowInfo.pixel_size*0.2)};
+	ivec2 size = {(int)(windowInfo.window_height/windowInfo.pixel_size*0.1)*4, (int)(windowInfo.window_height/windowInfo.pixel_size*0.1)};
+	menu1->buttons[0].pos = {pos.x, pos.y};
+	menu1->buttons[0].size = {size.x, size.y};
+	menu1->buttons[0].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
+	menu1->buttons[0].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
+	menu1->buttons[0].event = loadStartPage;
+	menu1->buttons[0].text = "Startbildschirm";
+	menu1->buttons[0].image = buttonImage;
+	menu1->buttons[0].textsize = size.y/2;
+	pos.y -= size.y+(int)(windowInfo.window_height/windowInfo.pixel_size*0.0125);
+	menu1->buttons[1].pos = {pos.x, pos.y};
+	menu1->buttons[1].size = {size.x, size.y};
+	menu1->buttons[1].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
+	menu1->buttons[1].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
+	menu1->buttons[1].event = loadWorkoutPage;
+	menu1->buttons[1].text = "Starte Workout";
+	menu1->buttons[1].image = buttonImage;
+	menu1->buttons[1].textsize = size.y/2;
+	menu1->button_count = 4;
+
+	pos = {(int)(windowInfo.window_width/windowInfo.pixel_size*0.125), (int)(windowInfo.window_height/windowInfo.pixel_size*0.125)};
+	menu1->labels[0].pos = {pos.x, pos.y};
+	menu1->labels[0].text = "Dauer: " + std::to_string(workout->duration) + "min";
+	menu1->labels[0].text_size = 31;
+	pos.x += (int)(windowInfo.window_width/windowInfo.pixel_size*0.375);
+	menu1->buttons[2].pos = {pos.x, pos.y};
+	menu1->buttons[2].size = {size.y, size.y};
+	menu1->buttons[2].repos = {(int)(pos.x-size.y*0.05), (int)(pos.y-size.y*0.05)};
+	menu1->buttons[2].resize = {(int)(size.y+size.y*0.1), (int)(size.y+size.y*0.1)};
+	menu1->buttons[2].event = incWorkoutTime;
+	menu1->buttons[2].text = "+";
+	menu1->buttons[2].image = buttonImage;
+	menu1->buttons[2].textsize = size.y/2;
+	pos.x += size.y;
+	menu1->buttons[3].pos = {pos.x, pos.y};
+	menu1->buttons[3].size = {size.y, size.y};
+	menu1->buttons[3].repos = {(int)(pos.x-size.y*0.05), (int)(pos.y-size.y*0.05)};
+	menu1->buttons[3].resize = {(int)(size.y+size.y*0.1), (int)(size.y+size.y*0.1)};
+	menu1->buttons[3].event = decWorkoutTime;
+	menu1->buttons[3].text = "-";
+	menu1->buttons[3].image = buttonImage;
+	menu1->buttons[3].textsize = size.y/2;
+	menu1->label_count = 1;
+
+	main_page.menus[0] = menu1;
+	main_page.menu_count = 1;
+
+//	main_page.code = ;
+
+	return SUCCESS;
+}
+
+static WORD pre_distance = 0;
+void runWorkout(HWND window){
+#ifndef NO_DEVICE
+		refreshData(queue, 250);
+#endif
+	pre_distance = rowingData.dist - pre_distance;
+	pre_distance = rowingData.dist;
+	if(!updateWorkout(*workout, pre_distance)){
+		main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist) + 'm';
+		main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + std::to_string(rowingData.ms_total) + "m/s";
+		float avg_ms = 0;
+		uint total_sec = rowingData.sec+rowingData.min*60+rowingData.hrs*3600;
+		if(total_sec > 0){
+			avg_ms = (float)rowingData.dist/total_sec;
+		}
+		main_page.menus[0]->labels[2].text = "Durchschnittlich: " + float_to_string(avg_ms) + "m/s";
+		WORD hrs = workout->duration/3600;
+		WORD min = (workout->duration/60)%60;
+		WORD sec = workout->duration%60;
+		main_page.menus[0]->labels[3].text = "Zeit: " + std::to_string(hrs) + ':' + std::to_string(min) + ':' + std::to_string(sec);
+	}
+}
+ErrCode switchToWorkoutPage(HWND window){
+	destroyPageNoFont(main_page);
+	pre_distance = 0;
+
+	WORD idx;
+	ErrCheck(getWindow(window, idx));
+	WindowInfo& windowInfo = app.info[idx];
+
+	Menu* menu1 = new Menu;
+
+	Image* buttonImage = new Image;
+	ErrCheck(loadImage("textures/button.tex", *buttonImage), "button image laden");
+	menu1->images[0] = buttonImage;
+	menu1->image_count = 1;
+
+	ivec2 pos = {(int)(windowInfo.window_width/windowInfo.pixel_size*0.125), windowInfo.window_height/windowInfo.pixel_size-(int)(windowInfo.window_height/windowInfo.pixel_size*0.2)};
+	ivec2 size = {(int)(windowInfo.window_height/windowInfo.pixel_size*0.1)*4, (int)(windowInfo.window_height/windowInfo.pixel_size*0.1)};
+	menu1->buttons[0].pos = {pos.x, pos.y};
+	menu1->buttons[0].size = {size.x, size.y};
+	menu1->buttons[0].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
+	menu1->buttons[0].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
+	menu1->buttons[0].event = loadStartPage;
+	menu1->buttons[0].text = "Startbildschirm";
+	menu1->buttons[0].image = buttonImage;
+	menu1->buttons[0].textsize = size.y/2;
+	menu1->button_count = 1;
+
+	WORD w = windowInfo.window_width/windowInfo.pixel_size;
+	WORD label_text_size = w*0.0775;
+	menu1->labels[0].pos = {20, 20};
+	menu1->labels[0].text_size = label_text_size;
+	menu1->labels[1].pos = {20, 20+label_text_size+(WORD)(label_text_size*0.16)};
+	menu1->labels[1].text_size = label_text_size;
+	menu1->labels[2].pos = {20, 20+label_text_size*2+(WORD)(label_text_size*0.16*2)};
+	menu1->labels[2].text_size = label_text_size;
+	menu1->labels[3].pos = {20, 20+label_text_size*3+(WORD)(label_text_size*0.16*3)};
+	menu1->labels[3].text_size = label_text_size;
+	menu1->label_count = 4;
+
+	main_page.menus[0] = menu1;
+	main_page.menu_count = 1;
+
+	main_page.code = runWorkout;
 
 	return SUCCESS;
 }

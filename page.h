@@ -21,7 +21,7 @@ struct Page{
 	Image* images[MAX_IMAGES];
 	ImageInfo imageInfo[MAX_IMAGES];
 	WORD image_count = 0;
-	Font* font = nullptr;		//TODO Sollte evtl. auch im Menu sein?
+	Font* font = nullptr;
 	void (*code)(HWND) = _default_page_function;
 };
 

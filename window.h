@@ -107,7 +107,7 @@ ErrCode openWindow(HINSTANCE hInstance, LONG window_width, LONG window_height, W
 	uint h = rect.bottom - rect.top;
 
 	//Erstelle das Fenster	//TODO x und y offset angeben können
-	app.windows[app.window_count] = CreateWindow(window_class.lpszClassName, name, WS_VISIBLE | WS_OVERLAPPEDWINDOW, 0, 0, w, h, parentWindow, NULL, hInstance, NULL);
+	app.windows[app.window_count] = CreateWindow(window_class.lpszClassName, name, WS_VISIBLE | WS_OVERLAPPEDWINDOW, 100, 50, w, h, parentWindow, NULL, hInstance, NULL);
 	window = app.windows[app.window_count];
 
 	//Bitmap-Info	//TODO muss eigentlich nicht immer neu beschrieben werden, da es ja nur eins gibt...
@@ -459,10 +459,33 @@ uint drawFontChar(HWND window, Font& font, char symbol, uint start_x, uint start
 	return 0;
 }
 
+//Wie oben nur ist idx der Fenster index
+WORD drawFontChar(WORD idx, Font& font, char symbol, uint start_x, uint start_y){
+	uint val = (symbol-32);
+	float div = (float)font.char_size.y/font.font_size;
+	uint end_x = start_x+font.char_sizes[val]/div;
+	uint end_y = start_y+font.font_size;
+	uint x_offset = (val%16)*font.char_size.x;
+	uint y_offset = (val/16)*font.char_size.y;
+	uint buffer_width = app.info[idx].window_width/app.info[idx].pixel_size;
+	uint* pixels = app.pixels[idx];
+	for(uint y=start_y; y < end_y; ++y){
+		float scaled_y = (float)(y-start_y)/(end_y-start_y);
+		for(uint x=start_x; x < end_x; ++x){
+			uint ry = scaled_y*font.char_size.y;
+			uint rx = (float)(x-start_x)/(end_x-start_x)*(font.char_sizes[val]-1);
+			uint color = font.image.data[(ry+y_offset)*font.image.width+rx+x_offset];
+			if(A(color) > 0) pixels[y*buffer_width+x] = color;
+		}
+	}
+	return end_x-start_x;
+}
+
 //Zerstört eine im Heap allokierte Font und alle weiteren allokierten Elemente
-void destroyFont(Font* font){
+void destroyFont(Font*& font){
 	destroyImage(font->image);
 	delete font;
+	font = nullptr;
 }
 
 ErrCode _defaultEvent(void){return SUCCESS;}

@@ -1,3 +1,4 @@
+#pragma once
 #include "window.h"
 
 struct DataPoint{
@@ -5,29 +6,57 @@ struct DataPoint{
 	WORD y;
 };
 
-ErrCode drawGraph(HWND window, uint x, uint y, uint size_x, uint size_y, DataPoint* data, WORD data_count){
+//Zeichnet die DataPoints basierend auf den x Daten (immer inkrementell um 1)
+ErrCode drawGraph(HWND window, Font& font, uint x, uint y, uint size_x, uint size_y, DataPoint* data, WORD data_count){
 	for(WORD i=0; i < app.window_count; ++i){
 		if(app.windows[i] == window){
-			uint inc = size_y/5;
+			WORD inc_y = size_y/5;
 			drawRectangle(i, x, y, size_x, size_y, RGBA(40, 40, 40));
 			drawLine(i, x, y, x+size_x, y, RGBA(70, 70, 70));
 			drawLine(i, x, y, x, y+size_y, RGBA(70, 70, 70));
 			drawLine(i, x, y+size_y, x+size_x, y+size_y, RGBA(70, 70, 70));
 			drawLine(i, x+size_x, y, x+size_x, y+size_y, RGBA(70, 70, 70));
 			for(WORD j=1; j < 5; ++j){
-				drawLine(i, x, y+inc*j, x+size_x, y+inc*j, RGBA(70, 70, 70));
+				drawLine(i, x, y+inc_y*j, x+size_x, y+inc_y*j, RGBA(70, 70, 70));
 			}
-			inc = size_x/(data_count+1);
-			WORD min_y = data[0].y; WORD max_y = data[0].y;
-			for(WORD j=0; j < data_count; ++j){
-				if(data[j].y < min_y) min_y = data[j].y;
-				if(data[j].y > max_y) max_y = data[j].y;
-			}
+			//min, max x
 			WORD min_x = data[0].x; WORD max_x = data[0].x;
 			for(WORD j=0; j < data_count; ++j){
 				if(data[j].x < min_x) min_x = data[j].x;
 				if(data[j].x > max_x) max_x = data[j].x;
 			}
+			//X labels
+			WORD inc_x = (size_x-10)/(max_x-min_x);
+			WORD tmp = font.font_size;
+			font.font_size = size_x*0.048;
+			for(WORD j=0; j < (max_x-min_x)+1; ++j){
+				std::string txt = std::to_string(min_x+j);
+				for(size_t k=0; k < txt.size(); ++k){
+					drawFontChar(i, font, txt[k], x+5-font.font_size/4+inc_x*j, y+size_y);
+				}
+			}
+			font.font_size = tmp;
+			//min, max y
+			WORD min_y = data[0].y; WORD max_y = data[0].y;
+			for(WORD j=0; j < data_count; ++j){
+				if(data[j].y < min_y) min_y = data[j].y;
+				if(data[j].y > max_y) max_y = data[j].y;
+			}
+			//Y labels (10 Daten)
+			inc_y = (size_y-10)/9;
+			WORD inc_y_data = (max_y-min_y+1)/9;
+			tmp = font.font_size;
+			font.font_size = size_x*0.048;
+			for(WORD j=0; j < 10; ++j){
+				std::string txt = std::to_string(min_y+j*inc_y_data);
+				WORD offset=0;
+				WORD total_offset = getStringFontSize(font, txt);
+				for(size_t k=0; k < txt.size(); ++k){
+					offset += drawFontChar(i, font, txt[k], x+offset-total_offset, y+size_y-5-font.font_size/2-inc_y*j);
+				}
+			}
+			font.font_size = tmp;
+			//DataPoints zeichnen und mit Linien verbinden
 			WORD last_x; WORD last_y;
 			for(WORD j=1; j < data_count+1; ++j){
 				float pos_y = ((float)data[j-1].y-min_y)/(max_y-min_y);
