@@ -1,10 +1,60 @@
 #pragma once
+#include <fstream>
 #include "window.h"
+#include "util.h"
+
+struct Statistic{
+	WORD distance = 0;	//Tägliche Distanz in m
+	SYSTEMTIME time;	//Zeitpunkt (nur Tag, Monat und Jahr werden gespeichert)
+};
 
 struct DataPoint{
 	WORD x;
 	WORD y;
 };
+
+//TODO Tag und Monat brauchen theoretisch nur jeweils ein Byte
+ErrCode saveStatistic(Statistic& statistics, bool override = false){
+	std::fstream file;
+	file.open("data/stats.txt", std::ios::out | std::ios::binary | std::ios::app);
+	if(!file.is_open()){
+		file.close();
+		return FILE_NOT_FOUND;
+	}
+	if(override) file.seekp(-8);
+	char* distance = (char*)(&statistics.distance);
+	file.write(distance, 2);
+	char* time = (char*)(&statistics.time.wDay);
+	file.write(time, 2);
+	time = (char*)(&statistics.time.wMonth);
+	file.write(time, 2);
+	time = (char*)(&statistics.time.wYear);
+	file.write(time, 2);
+	file.close();
+	return SUCCESS;
+}
+
+ErrCode readStatistics(Statistic* data, WORD data_count){
+	std::fstream file;
+	file.open("data/stats.txt", std::ios::in | std::ios::binary);
+	if(!file.is_open()) return FILE_NOT_FOUND;
+	file.seekg(0, std::ios::end);
+	DWORD size = file.tellg();
+	DWORD offset = 8;
+	for(WORD i=0; i < data_count; ++i, offset+=8){
+		if(offset > size){
+			file.close();
+			return SUCCESS;
+		}
+		file.seekg(size-offset, std::ios::beg);
+		file.read((char*)(&data[i].distance), 2);
+		file.read((char*)(&data[i].time.wDay), 2);
+		file.read((char*)(&data[i].time.wMonth), 2);
+		file.read((char*)(&data[i].time.wYear), 2);
+	}
+	file.close();
+	return SUCCESS;
+}
 
 //Zeichnet die DataPoints basierend auf den x Daten (immer inkrementell um 1)
 ErrCode drawGraph(HWND window, Font& font, uint x, uint y, uint size_x, uint size_y, DataPoint* data, WORD data_count){

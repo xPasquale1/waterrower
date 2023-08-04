@@ -22,7 +22,10 @@ enum ErrCode{
 	WINDOW_NOT_FOUND,
 	TOO_MANY_WINDOWS,
 	REQUEST_NOT_FOUND,
-	INVALID_WORKOUT
+	INVALID_WORKOUT,
+	INVALID_USB_HANDLE,
+	COMMSTATE_ERROR,
+	TIMEOUT_SET_ERROR
 };
 enum ErrCodeFlags{
 	NO_ERR_FLAG = 0,
@@ -59,6 +62,15 @@ inline constexpr ErrCode ErrCheck(ErrCode code, const char* msg="\0", ErrCodeFla
 	case INVALID_WORKOUT:
 		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[INVALID_WORKOUT ERROR] " << msg << std::endl;
 		return INVALID_WORKOUT;
+	case INVALID_USB_HANDLE:
+		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[INVALID_USB_HANDLE ERROR] " << msg << std::endl;
+		return INVALID_USB_HANDLE;
+	case COMMSTATE_ERROR:
+		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[COMMSTATE_ERROR ERROR] " << msg << std::endl;
+		return COMMSTATE_ERROR;
+	case TIMEOUT_SET_ERROR:
+		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[TIMEOUT_SET_ERROR ERROR] " << msg << std::endl;
+		return TIMEOUT_SET_ERROR;
 	default: return SUCCESS;
 	}
 	return SUCCESS;

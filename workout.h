@@ -2,12 +2,21 @@
 #include <windows.h>
 #include "util.h"
 
+enum WORKOUTFLAGS{
+	WORKOUT_DONE = 1
+};
+
 struct Workout{
 	BYTE id = 0;			//0 -> Zeitworkout
 	SYSTEMTIME last_time;	//Start-Zeitpunkt
 	long duration = 0;		//in Sekunden
 	WORD distance = 0;		//Ruderweite
+	BYTE flags = 0;			//Flags
 };
+
+inline constexpr bool getWorkoutFlag(Workout& workout, WORKOUTFLAGS flag){return (workout.flags & flag);}
+inline constexpr void setWorkoutFlag(Workout& workout, WORKOUTFLAGS flag){workout.flags |= flag;}
+inline constexpr void resetWorkoutFlag(Workout& workout, WORKOUTFLAGS flag){workout.flags &= ~flag;}
 
 void createWorkout(Workout*& workout){
 	workout = new Workout;

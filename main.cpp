@@ -84,12 +84,18 @@ void displayDataPage(HWND window){
 }
 
 void displayStatistics(HWND window){
-	DataPoint dps[] = {{1, 234}, {2, 313}, {4, 284}, {5, 323}, {6, 274}, {7, 198}, {8, 244}, {9, 302}}; WORD dps_count = 8;
+	Statistic s[10] = {};
+	DataPoint dps[10];
+	ErrCheck(readStatistics(s, 10));
+	for(int i=0; i < 10; ++i){
+		dps[i].x = i;
+		dps[i].y = s[9-i].distance;
+	}
 	WORD idx;
 	ErrCheck(getWindow(window, idx));
 	WORD width = app.info[idx].window_width/app.info[idx].pixel_size;
 	WORD height = app.info[idx].window_height/app.info[idx].pixel_size;
-	ErrCheck(drawGraph(window, *default_font, width/2-width*0.625/2, height*0.0625, width*0.625, height*0.625, dps, dps_count));
+	ErrCheck(drawGraph(window, *default_font, width/2-width*0.625/2, height*0.0625, width*0.625, height*0.625, dps, 10));
 }
 
 INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){
@@ -454,14 +460,11 @@ ErrCode switchToCreateWorkoutPage(HWND window){
 	return SUCCESS;
 }
 
-static WORD pre_distance = 0;
 void runWorkout(HWND window){
 #ifndef NO_DEVICE
 		refreshData(queue, 250);
 #endif
-	pre_distance = rowingData.dist - pre_distance;
-	pre_distance = rowingData.dist;
-	if(!updateWorkout(*workout, pre_distance)){
+	if(!updateWorkout(*workout, rowingData.dist - workout->distance)){
 		main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist) + 'm';
 		main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + std::to_string(rowingData.ms_total) + "m/s";
 		float avg_ms = 0;
@@ -474,11 +477,26 @@ void runWorkout(HWND window){
 		WORD min = (workout->duration/60)%60;
 		WORD sec = workout->duration%60;
 		main_page.menus[0]->labels[3].text = "Zeit: " + std::to_string(hrs) + ':' + std::to_string(min) + ':' + std::to_string(sec);
+	}else{
+		if(getWorkoutFlag(*workout, WORKOUT_DONE)){
+			Statistic s1;
+			s1.distance = workout->distance;
+			GetSystemTime(&s1.time);
+			Statistic s2;
+			readStatistics(&s2, 1);
+			if(s2.time.wYear == s1.time.wYear && s2.time.wMonth == s1.time.wMonth && s2.time.wDay == s1.time.wDay){
+				s1.distance += s2.distance;
+				saveStatistic(s1, true);
+			}else{
+				saveStatistic(s1, false);
+			}
+			setWorkoutFlag(*workout, WORKOUT_DONE);
+		}
 	}
 }
 ErrCode switchToWorkoutPage(HWND window){
 	destroyPageNoFont(main_page);
-	pre_distance = 0;
+	workout->distance = 0;
 
 	WORD idx;
 	ErrCheck(getWindow(window, idx));
