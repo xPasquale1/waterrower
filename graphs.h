@@ -94,11 +94,11 @@ ErrCode drawGraph(HWND window, Font& font, uint x, uint y, uint size_x, uint siz
 			}
 			//Y labels (10 Daten)
 			inc_y = (size_y-10)/9;
-			WORD inc_y_data = (max_y-min_y+1)/9;
+			float inc_y_data = ((float)(max_y-min_y))/9.f;
 			tmp = font.font_size;
 			font.font_size = size_x*0.048;
 			for(WORD j=0; j < 10; ++j){
-				std::string txt = std::to_string(min_y+j*inc_y_data);
+				std::string txt = std::to_string((WORD)(min_y+j*inc_y_data));
 				WORD offset=0;
 				WORD total_offset = getStringFontSize(font, txt);
 				for(size_t k=0; k < txt.size(); ++k){
@@ -109,13 +109,12 @@ ErrCode drawGraph(HWND window, Font& font, uint x, uint y, uint size_x, uint siz
 			//DataPoints zeichnen und mit Linien verbinden
 			WORD last_x; WORD last_y;
 			for(WORD j=1; j < data_count+1; ++j){
-				float pos_y = ((float)data[j-1].y-min_y)/(max_y-min_y);
+				float pos_y = ((float)data[j-1].y-min_y)/(max_y-min_y+1);
 				float pos_x = ((float)data[j-1].x-min_x)/(max_x-min_x);
 				drawRectangle(i, x+5+pos_x*(size_x-10)-1, y+size_y-5-pos_y*(size_y-10)-1, 3, 3, RGBA(90, 90, 90));
 				if(j > 1) drawLine(i, x+5+pos_x*(size_x-10), y+size_y-5-pos_y*(size_y-10), last_x, last_y, RGBA(120, 0, 0));
 				last_x = x+5+pos_x*(size_x-10); last_y = y+size_y-5-pos_y*(size_y-10);
 			}
-
 			return SUCCESS;
 		}
 	}
