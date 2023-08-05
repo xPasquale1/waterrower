@@ -13,7 +13,7 @@ extern "C"{
 
 //#define NO_DEVICE
 
-HANDLE hDevice;
+HANDLE hDevice = nullptr;
 BYTE receiveBuffer[128];
 BYTE sendBuffer[128];
 RequestQueue queue;
@@ -58,17 +58,13 @@ void refreshData(RequestQueue& queue, WORD interval=250){
 		ErrCheck(addRequest(queue, 1));
 		ErrCheck(addRequest(queue, 2));
 		ErrCheck(addRequest(queue, 3));
-		ErrCheck(addRequest(queue, 4));
-		ErrCheck(addRequest(queue, 5));
-		ErrCheck(addRequest(queue, 6));
-		ErrCheck(addRequest(queue, 7));
 		ErrCheck(addRequest(queue, 8));
 	}
 }
 
 void displayDataPage(HWND window){
 #ifndef NO_DEVICE
-		refreshData(queue, 500);
+		refreshData(queue, 250);
 #endif
 	main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist) + 'm';
 	main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + std::to_string(rowingData.ms_total) + "m/s";
@@ -89,7 +85,7 @@ void displayStatistics(HWND window){
 		dps[i].x = i;
 		dps[i].y = s[9-i].distance;
 	}
-	WORD idx;
+	WORD idx = 0;
 	ErrCheck(getWindow(window, idx));
 	WORD width = app.info[idx].window_width/app.info[idx].pixel_size;
 	WORD height = app.info[idx].window_height/app.info[idx].pixel_size;
@@ -98,9 +94,16 @@ void displayStatistics(HWND window){
 
 INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){
 #ifndef NO_DEVICE
-	if(ErrCheck(open_device(hDevice, "\\\\.\\COM6", 19200), "Gerät öffnen") != SUCCESS){
+	for(WORD i=0; i < 10; ++i){
+		std::string port = "\\\\.\\COM" + std::to_string(i);
+		if(openDevice(hDevice, port.c_str(), 19200) == SUCCESS){
+			break;
+		};
+	}
+	if(!hDevice){
+		std::cerr << "Konnte keine Gerät finden!" << std::endl;
 		return -1;
-	};
+	}
 #endif
 	HWND main_window;
 	if(ErrCheck(openWindow(hInstance, 800, 800, 1, main_window, "waterrower", main_window_callback), "open main window") != SUCCESS){
@@ -108,7 +111,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	};
 
 #ifndef NO_DEVICE
-	init_communication(hDevice, sendBuffer, receiveBuffer);
+	initCommunication(hDevice, sendBuffer, receiveBuffer);
 #endif
 
 	default_font = new Font;
@@ -247,7 +250,7 @@ ErrCode switchToStartPage(HWND window){
 	destroyPageNoFont(main_page);
 	destroyWorkout(workout);
 
-	WORD idx;
+	WORD idx = 0;
 	ErrCheck(getWindow(window, idx));
 	WindowInfo& windowInfo = app.info[idx];
 
@@ -326,7 +329,7 @@ ErrCode endFreeTraining(){
 ErrCode switchToFreeTrainingPage(HWND window){
 	destroyPageNoFont(main_page);
 
-	WORD idx;
+	WORD idx = 0;
 	ErrCheck(getWindow(window, idx));
 	WindowInfo& windowInfo = app.info[idx];
 
@@ -372,7 +375,7 @@ ErrCode switchToFreeTrainingPage(HWND window){
 ErrCode switchToStatistikPage(HWND window){
 	destroyPageNoFont(main_page);
 
-	WORD idx;
+	WORD idx = 0;
 	ErrCheck(getWindow(window, idx));
 	WindowInfo& windowInfo = app.info[idx];
 
@@ -418,7 +421,7 @@ ErrCode switchToCreateWorkoutPage(HWND window){
 	destroyWorkout(workout);
 	createWorkout(workout);
 
-	WORD idx;
+	WORD idx = 0;
 	ErrCheck(getWindow(window, idx));
 	WindowInfo& windowInfo = app.info[idx];
 
@@ -520,7 +523,7 @@ ErrCode switchToWorkoutPage(HWND window){
 	destroyPageNoFont(main_page);
 	workout->distance = 0;
 
-	WORD idx;
+	WORD idx = 0;
 	ErrCheck(getWindow(window, idx));
 	WindowInfo& windowInfo = app.info[idx];
 

@@ -11,7 +11,7 @@ extern "C"{
 //#define SHOW_ERRORS	//Überschreibt SILENT nur für Fehlernachrichten
 
 //ret: Handle für das Gerät
-ErrCode open_device(HANDLE& handle, const char* devicePath = "\\\\.\\COM3", DWORD baudrate = 9600){
+ErrCode openDevice(HANDLE& handle, const char* devicePath = "\\\\.\\COM3", DWORD baudrate = 9600){
 	HANDLE hDevice = CreateFile(devicePath, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0);
 	if(hDevice == INVALID_HANDLE_VALUE){
 		std::cerr << GetLastError() << std::endl;
@@ -113,7 +113,7 @@ int sendPacket(HANDLE hDevice, BYTE* data, DWORD length){
 	return bytesSent;
 }
 
-void print_packet(BYTE* buffer, int length){
+void printPacket(BYTE* buffer, int length){
 	SYSTEMTIME lpSystemTime;
 	GetSystemTime(&lpSystemTime);
 	std::cout << "Packet " << lpSystemTime.wHour << ':' << lpSystemTime.wMinute << ':' << lpSystemTime.wSecond << '.' << lpSystemTime.wMilliseconds << std::endl;
@@ -123,19 +123,19 @@ void print_packet(BYTE* buffer, int length){
 	std::cout << std::endl;
 }
 
-int init_communication(HANDLE hDevice, BYTE* sendBuffer, BYTE* receiveBuffer){
+int initCommunication(HANDLE hDevice, BYTE* sendBuffer, BYTE* receiveBuffer){
 	int length;
 	strcpy((char*)sendBuffer, "USB");
 	sendPacket(hDevice, sendBuffer, sizeof("USB")-1);
 	while((length = readPacket(hDevice, receiveBuffer, 128)) < 1);
 #ifndef SILENT
-	print_packet(receiveBuffer, length);
+	printPacket(receiveBuffer, length);
 #endif
 	strcpy((char*)sendBuffer, "IV?");
 	sendPacket(hDevice, sendBuffer, sizeof("IV?")-1);
 	while((length = readPacket(hDevice, receiveBuffer, 128)) < 1);
 #ifndef SILENT
-	print_packet(receiveBuffer, length);
+	printPacket(receiveBuffer, length);
 #endif
 	return 0;
 }
@@ -192,7 +192,7 @@ ErrCode addRequest(RequestQueue& queue, DWORD id){
 		queue.request_ptr1 = (queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE);
 		return SUCCESS;
 	}
-	case 5:{	//Meter pro Sekunde durschnitt Abfrage
+	case 5:{	//Meter pro Sekunde durschnitts Abfrage
 		strcpy((char*)queue.requests[queue.request_ptr1].data, "IRD14A");
 		queue.requests[queue.request_ptr1].length = sizeof("IRD14A")-1;
 		queue.request_ptr1 = (queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE);
@@ -239,7 +239,7 @@ void transmitRequests(RequestQueue& queue, HANDLE hDevice){
 	currentmilli += last_request_tp.wSecond*1000;
 	currentmilli += last_request_tp.wMinute*60000;
 	currentmilli += last_request_tp.wHour*3600000;
-	if(newmilli - currentmilli > 25){
+	if(newmilli - currentmilli >= 25){
 		last_request_tp = systemTime;
 		sendPacket(hDevice, queue.requests[queue.request_ptr2].data, queue.requests[queue.request_ptr2].length);
 		queue.request_ptr2 = (queue.request_ptr2+1)%(REQUEST_QUEUE_SIZE);
@@ -260,26 +260,30 @@ struct RowingData{
 }; static RowingData rowingData;
 
 //3 Bytes zu int
-constexpr inline int codeToInt(const char* code){
+constexpr inline int codeToInt3(const char* code){
 	return (code[0]|code[1]<<8|code[2]<<16);
+}
+//2 Bytes zu int
+constexpr inline int codeToInt2(const char* code){
+	return (code[0]|code[1]<<8);
 }
 
 //TODO idk warum diese Funktion einen Rückgabewert hat
 //ich meine man könnte es als einen Fehler ansehen wenn es den Code nicht gibt...
 int checkCode(BYTE* receiveBuffer, int length){
 	BYTE code[3]; code[0] = receiveBuffer[0]; code[1] = receiveBuffer[1]; code[2] = receiveBuffer[2];
-	switch(codeToInt((char*)code)){
+	switch(codeToInt3((char*)code)){
 
-	case codeToInt("ERR"):{	//Fehlermeldung
+	case codeToInt3("ERR"):{	//Fehlermeldung
 #if defined(SHOW_ERRORS)
-		print_packet(receiveBuffer, length);
+		printPacket(receiveBuffer, length);
 #elif !defined(SILENT)
-		print_packet(receiveBuffer, length);
+		printPacket(receiveBuffer, length);
 #endif
 		break;
 	}
 
-	case codeToInt("IDT"):{	//Dreifacher Speicherbereich
+	case codeToInt3("IDT"):{	//Dreifacher Speicherbereich
 		BYTE value[7]; value[6] = '\0';
 		for(int i=0; i < 6; ++i){
 			value[i] = receiveBuffer[i+6];
@@ -288,19 +292,19 @@ int checkCode(BYTE* receiveBuffer, int length){
 		for(int i=0; i < 3; ++i){
 			location[i] = receiveBuffer[i+3];
 		}
-		switch(codeToInt((char*)location)){
-		case codeToInt("057"):{
+		switch(codeToInt3((char*)location)){
+		case codeToInt3("057"):{
 			rowingData.dist = strtol((char*)value, 0, 16);
 			break;
 		}
 		}
 #ifndef SILENT
-		print_packet(receiveBuffer, length);
+		printPacket(receiveBuffer, length);
 #endif
 		break;
 	}
 
-	case codeToInt("IDD"):{	//Doppelter Speicherbereich
+	case codeToInt3("IDD"):{	//Doppelter Speicherbereich
 		BYTE value[5]; value[4] = '\0';
 		for(int i=0; i < 2; ++i){
 			value[i] = receiveBuffer[i+6];
@@ -309,27 +313,27 @@ int checkCode(BYTE* receiveBuffer, int length){
 		for(int i=0; i < 3; ++i){
 			location[i] = receiveBuffer[i+3];
 		}
-		switch(codeToInt((char*)location)){
-		case codeToInt("148"):{
+		switch(codeToInt3((char*)location)){
+		case codeToInt3("148"):{
 			rowingData.ms_total = strtol((char*)value, 0, 16);
 			break;
 		}
-		case codeToInt("14A"):{
+		case codeToInt3("14A"):{
 			rowingData.ms_avg = strtol((char*)value, 0, 16);
 			break;
 		}
-		case codeToInt("140"):{
+		case codeToInt3("140"):{
 			rowingData.strokes = strtol((char*)value, 0, 16);
 			break;
 		}
 		}
 #ifndef SILENT
-		print_packet(receiveBuffer, length);
+		printPacket(receiveBuffer, length);
 #endif
 		break;
 	}
 
-	case codeToInt("IDS"):{	//Einzelner Speicherbereich
+	case codeToInt3("IDS"):{	//Einzelner Speicherbereich
 		BYTE value[3]; value[2] = '\0';
 		for(int i=0; i < 2; ++i){
 			value[i] = receiveBuffer[i+6];
@@ -338,48 +342,47 @@ int checkCode(BYTE* receiveBuffer, int length){
 		for(int i=0; i < 3; ++i){
 			location[i] = receiveBuffer[i+3];
 		}
-		switch(codeToInt((char*)location)){
-		case codeToInt("1E1"):{
+		switch(codeToInt3((char*)location)){
+		case codeToInt3("1E1"):{
 			rowingData.sec = strtol((char*)value, 0, 16);
 			break;
 		}
-		case codeToInt("1E2"):{
+		case codeToInt3("1E2"):{
 			rowingData.min = strtol((char*)value, 0, 16);
 			break;
 		}
-		case codeToInt("1E3"):{
+		case codeToInt3("1E3"):{
 			rowingData.hrs = strtol((char*)value, 0, 16);
 			break;
 		}
-		case codeToInt("142"):{
+		case codeToInt3("142"):{
 			rowingData.stroke_avg = strtol((char*)value, 0, 16);
 			break;
 		}
-		case codeToInt("143"):{
+		case codeToInt3("143"):{
 			rowingData.stroke_pull = strtol((char*)value, 0, 16);
 			break;
 		}
-		case codeToInt("0A9"):{
+		case codeToInt3("0A9"):{
 			rowingData.volume = strtol((char*)value, 0, 16);
 			break;
 		}
 		}
 #ifndef SILENT
-		print_packet(receiveBuffer, length);
+		printPacket(receiveBuffer, length);
 #endif
 		break;
 	}
 
 	}
 
-	code[2] = 0;
-	switch(codeToInt((char*)code)){
-	case(codeToInt("SS")):{
-		print_packet(receiveBuffer, length);
+	switch(codeToInt2((char*)code)){
+	case(codeToInt2("SS")):{
+		printPacket(receiveBuffer, length);
 		break;
 	}
-	case(codeToInt("SE")):{
-		print_packet(receiveBuffer, length);
+	case(codeToInt2("SE")):{
+		printPacket(receiveBuffer, length);
 		break;
 	}
 	}

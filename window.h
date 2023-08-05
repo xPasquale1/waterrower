@@ -62,7 +62,7 @@ inline bool getWindowState(HWND window, WINDOWSTATE state){
 //TODO Fehler melden
 //Gibt den nächsten Zustand des Fensters zurück, Anwendung z.B. while(getNextWindowState())...
 inline WINDOWSTATE getNextWindowState(HWND window){
-	WORD idx;
+	WORD idx = 0;
 	getWindow(window, idx);
 	WINDOWSTATETYPE state = app.info[idx].state & -app.info[idx].state;
 	app.info[idx].state &= ~state;
