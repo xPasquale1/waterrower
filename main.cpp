@@ -11,7 +11,10 @@ extern "C"{
 #include "graphs.h"
 #include "workout.h"
 
-//#define NO_DEVICE
+#define NO_DEVICE
+
+#define FPS 60
+#define FPSMILLIS 1000/FPS
 
 HANDLE hDevice = nullptr;
 BYTE receiveBuffer[128];
@@ -92,6 +95,26 @@ void displayStatistics(HWND window){
 	ErrCheck(drawGraph(window, *default_font, width/2-width*0.625/2, height*0.0625, width*0.625, height*0.625, dps, 10));
 }
 
+void renderFunc(HINSTANCE hInstance){
+	HWND main_window;
+	if(ErrCheck(openWindow(hInstance, 800, 800, 1, main_window, "waterrower", main_window_callback), "open main window") != SUCCESS){
+		return;
+	};
+	while(app.window_count){
+		SYSTEMTIME t1;
+		GetSystemTime(&t1);
+		ErrCheck(clearWindow(main_window), "clear window");
+		updatePage(main_page, main_window);
+		ErrCheck(drawWindow(main_window), "draw window");
+		handleSignals(main_window);
+		SYSTEMTIME t2;
+		GetSystemTime(&t2);
+		unsigned long long millis = t2.wMilliseconds-t1.wMilliseconds+(t2.wMinute-t1.wMinute)*60+(t2.wHour-t1.wHour)*3600;
+		if(millis < FPSMILLIS) Sleep(FPSMILLIS-millis);
+	}
+	return;
+}
+
 INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){
 #ifndef NO_DEVICE
 	for(WORD i=0; i < 10; ++i){
@@ -101,14 +124,10 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 		};
 	}
 	if(!hDevice){
-		std::cerr << "Konnte keine Gerät finden!" << std::endl;
+		std::cerr << "Konnte kein Gerät finden!" << std::endl;
 		return -1;
 	}
 #endif
-	HWND main_window;
-	if(ErrCheck(openWindow(hInstance, 800, 800, 1, main_window, "waterrower", main_window_callback), "open main window") != SUCCESS){
-		return -1;
-	};
 
 #ifndef NO_DEVICE
 	initCommunication(hDevice, sendBuffer, receiveBuffer);
@@ -121,13 +140,9 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 	ErrCheck(loadStartPage(), "laden des Startbildschirms");
 
+	std::thread render_thread(renderFunc, hInstance);
+
 	while(app.window_count){
-		ErrCheck(clearWindow(main_window), "clear window");
-
-		updatePage(main_page, main_window);
-
-		ErrCheck(drawWindow(main_window), "draw window");
-
 #ifndef NO_DEVICE
 		transmitRequests(queue, hDevice);
 
@@ -136,9 +151,10 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 			checkCode(receiveBuffer, length);
 		}
 #endif
-		handleSignals(main_window);
 	}
 
+	//Threads abfangen
+	render_thread.join();
 	//Aufräumen
 	destroyPageNoFont(main_page);
 	destroyFont(default_font);

@@ -28,48 +28,48 @@ enum ErrCode{
 	TIMEOUT_SET_ERROR
 };
 enum ErrCodeFlags{
-	NO_ERR_FLAG = 0,
-	NO_ERR_OUTPUT,
+	ERR_NO_FLAG = 0,
+	ERR_NO_OUTPUT,
 	ERR_ON_FATAL
 };
 //TODO ERR_ON_FATAL ausgeben können wenn der nutzer es so möchte
-inline ErrCode ErrCheck(ErrCode code, const char* msg="\0", ErrCodeFlags flags=NO_ERR_FLAG){
+inline ErrCode ErrCheck(ErrCode code, const char* msg="\0", ErrCodeFlags flags=ERR_NO_FLAG){
 	switch(code){
 	case BAD_ALLOC:
-		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[BAD_ALLOC ERROR] " << msg << std::endl;
+		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[BAD_ALLOC ERROR] " << msg << std::endl;
 		return BAD_ALLOC;
 	case TEXTURE_NOT_FOUND:
-		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[TEXTURE_NOT_FOUND ERROR] " << msg << std::endl;
+		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[TEXTURE_NOT_FOUND ERROR] " << msg << std::endl;
 		return TEXTURE_NOT_FOUND;
 	case MODEL_NOT_FOUND:
-		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[MODEL_NOT_FOUND ERROR] " << msg << std::endl;
+		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[MODEL_NOT_FOUND ERROR] " << msg << std::endl;
 		return MODEL_NOT_FOUND;
 	case FILE_NOT_FOUND:
-		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[FILE_NOT_FOUND ERROR] " << msg << std::endl;
+		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[FILE_NOT_FOUND ERROR] " << msg << std::endl;
 		return FILE_NOT_FOUND;
 	case QUEUE_FULL:
-		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[QUEUE_FULL ERROR] " << msg << std::endl;
+		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[QUEUE_FULL ERROR] " << msg << std::endl;
 		return QUEUE_FULL;
 	case WINDOW_NOT_FOUND:
-		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[WINDOW_NOT_FOUND ERROR] " << msg << std::endl;
+		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[WINDOW_NOT_FOUND ERROR] " << msg << std::endl;
 		return WINDOW_NOT_FOUND;
 	case TOO_MANY_WINDOWS:
-		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[TOO_MANY_WINDOWS ERROR] " << msg << std::endl;
+		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[TOO_MANY_WINDOWS ERROR] " << msg << std::endl;
 		return TOO_MANY_WINDOWS;
 	case REQUEST_NOT_FOUND:
-		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[REQUEST_NOT_FOUND ERROR] " << msg << std::endl;
+		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[REQUEST_NOT_FOUND ERROR] " << msg << std::endl;
 		return REQUEST_NOT_FOUND;
 	case INVALID_WORKOUT:
-		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[INVALID_WORKOUT ERROR] " << msg << std::endl;
+		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[INVALID_WORKOUT ERROR] " << msg << std::endl;
 		return INVALID_WORKOUT;
 	case INVALID_USB_HANDLE:
-		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[INVALID_USB_HANDLE ERROR] " << msg << std::endl;
+		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[INVALID_USB_HANDLE ERROR] " << msg << std::endl;
 		return INVALID_USB_HANDLE;
 	case COMMSTATE_ERROR:
-		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[COMMSTATE_ERROR ERROR] " << msg << std::endl;
+		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[COMMSTATE_ERROR ERROR] " << msg << std::endl;
 		return COMMSTATE_ERROR;
 	case TIMEOUT_SET_ERROR:
-		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[TIMEOUT_SET_ERROR ERROR] " << msg << std::endl;
+		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[TIMEOUT_SET_ERROR ERROR] " << msg << std::endl;
 		return TIMEOUT_SET_ERROR;
 	default: return SUCCESS;
 	}
