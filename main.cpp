@@ -301,6 +301,23 @@ ErrCode switchToStartPage(HWND window){
 	return SUCCESS;
 }
 
+ErrCode endFreeTraining(){
+	if(rowingData.dist){
+		Statistic s1;
+		s1.distance = rowingData.dist;
+		GetSystemTime(&s1.time);
+		Statistic s2;
+		readStatistics(&s2, 1);
+		if(s2.time.wYear == s1.time.wYear && s2.time.wMonth == s1.time.wMonth && s2.time.wDay == s1.time.wDay){
+			s1.distance += s2.distance;
+			saveStatistic(s1, true);
+		}else{
+			saveStatistic(s1, false);
+		}
+	}
+	ErrCheck(loadStartPage(), "freies Training zu Startseite");
+	return SUCCESS;
+}
 ErrCode switchToFreeTrainingPage(HWND window){
 	destroyPageNoFont(main_page);
 
@@ -321,7 +338,7 @@ ErrCode switchToFreeTrainingPage(HWND window){
 	menu1->buttons[0].size = {size.x, size.y};
 	menu1->buttons[0].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
 	menu1->buttons[0].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
-	menu1->buttons[0].event = loadStartPage;
+	menu1->buttons[0].event = endFreeTraining;
 	menu1->buttons[0].text = "Beenden";
 	menu1->buttons[0].image = buttonImage;
 	menu1->buttons[0].textsize = size.y/2;
