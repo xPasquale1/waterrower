@@ -371,5 +371,17 @@ int checkCode(BYTE* receiveBuffer, int length){
 	}
 
 	}
+
+	code[2] = 0;
+	switch(codeToInt((char*)code)){
+	case(codeToInt("SS")):{
+		print_packet(receiveBuffer, length);
+		break;
+	}
+	case(codeToInt("SE")):{
+		print_packet(receiveBuffer, length);
+		break;
+	}
+	}
 	return 0;
 }

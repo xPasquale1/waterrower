@@ -13,9 +13,7 @@ extern "C"{
 
 //#define NO_DEVICE
 
-#ifndef NO_DEVICE
 HANDLE hDevice;
-#endif
 BYTE receiveBuffer[128];
 BYTE sendBuffer[128];
 RequestQueue queue;
@@ -70,7 +68,7 @@ void refreshData(RequestQueue& queue, WORD interval=250){
 
 void displayDataPage(HWND window){
 #ifndef NO_DEVICE
-		refreshData(queue, 250);
+		refreshData(queue, 500);
 #endif
 	main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist) + 'm';
 	main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + std::to_string(rowingData.ms_total) + "m/s";
@@ -99,9 +97,11 @@ void displayStatistics(HWND window){
 }
 
 INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){
+#ifndef NO_DEVICE
 	if(ErrCheck(open_device(hDevice, "\\\\.\\COM6", 19200), "Gerät öffnen") != SUCCESS){
 		return -1;
 	};
+#endif
 	HWND main_window;
 	if(ErrCheck(openWindow(hInstance, 800, 800, 1, main_window, "waterrower", main_window_callback), "open main window") != SUCCESS){
 		return -1;
