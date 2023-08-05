@@ -33,7 +33,7 @@ enum ErrCodeFlags{
 	ERR_ON_FATAL
 };
 //TODO ERR_ON_FATAL ausgeben können wenn der nutzer es so möchte
-inline constexpr ErrCode ErrCheck(ErrCode code, const char* msg="\0", ErrCodeFlags flags=NO_ERR_OUTPUT){
+inline ErrCode ErrCheck(ErrCode code, const char* msg="\0", ErrCodeFlags flags=NO_ERR_FLAG){
 	switch(code){
 	case BAD_ALLOC:
 		if(!(flags&NO_ERR_OUTPUT)) std::cerr << "[BAD_ALLOC ERROR] " << msg << std::endl;

@@ -11,10 +11,10 @@ extern "C"{
 #include "graphs.h"
 #include "workout.h"
 
-#define NO_DEVICE
+//#define NO_DEVICE
 
 #ifndef NO_DEVICE
-HANDLE hDevice = open_device("\\\\.\\COM6", 19200);
+HANDLE hDevice;
 #endif
 BYTE receiveBuffer[128];
 BYTE sendBuffer[128];
@@ -99,8 +99,13 @@ void displayStatistics(HWND window){
 }
 
 INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){
+	if(ErrCheck(open_device(hDevice, "\\\\.\\COM6", 19200), "Gerät öffnen") != SUCCESS){
+		return -1;
+	};
 	HWND main_window;
-	ErrCheck(openWindow(hInstance, 800, 800, 1, main_window, "waterrower", main_window_callback), "open main window");
+	if(ErrCheck(openWindow(hInstance, 800, 800, 1, main_window, "waterrower", main_window_callback), "open main window") != SUCCESS){
+		return -1;
+	};
 
 #ifndef NO_DEVICE
 	init_communication(hDevice, sendBuffer, receiveBuffer);

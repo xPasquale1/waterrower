@@ -14,7 +14,7 @@ extern "C"{
 ErrCode open_device(HANDLE& handle, const char* devicePath = "\\\\.\\COM3", DWORD baudrate = 9600){
 	HANDLE hDevice = CreateFile(devicePath, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0);
 	if(hDevice == INVALID_HANDLE_VALUE){
-		std::cout << "Fehler beim Öffnen des Gerätehandles! " << GetLastError() << std::endl;
+		std::cerr << GetLastError() << std::endl;
 		return INVALID_USB_HANDLE;
 	}
     DCB dcbSerialParams = {};
@@ -22,7 +22,7 @@ ErrCode open_device(HANDLE& handle, const char* devicePath = "\\\\.\\COM3", DWOR
 	//Konfiguriere die Schnittstelle (Baudrate, Datenbits, Parität, Stoppbits)
 	dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
 	if(!GetCommState(hDevice, &dcbSerialParams)){
-		std::cout << "Fehler beim Abrufen der Schnittstelle-Einstellungen! " << GetLastError() << std::endl;
+		std::cerr << GetLastError() << std::endl;
 		CloseHandle(hDevice);
 		return COMMSTATE_ERROR;
 	}
@@ -31,7 +31,7 @@ ErrCode open_device(HANDLE& handle, const char* devicePath = "\\\\.\\COM3", DWOR
 	dcbSerialParams.StopBits = ONESTOPBIT;
 	dcbSerialParams.Parity = NOPARITY;
 	if(!SetCommState(hDevice, &dcbSerialParams)){
-		std::cout << "Fehler beim Konfigurieren der Schnittstelle-Einstellungen! " << GetLastError() << std::endl;
+		std::cerr << GetLastError() << std::endl;
 		CloseHandle(hDevice);
 		return COMMSTATE_ERROR;
 	}
@@ -42,7 +42,7 @@ ErrCode open_device(HANDLE& handle, const char* devicePath = "\\\\.\\COM3", DWOR
 	timeouts.WriteTotalTimeoutMultiplier = 0;
 	timeouts.WriteTotalTimeoutConstant = 0;
 	if(!SetCommTimeouts(hDevice, &timeouts)){
-		std::cout << "Fehler beim Konfigurieren der Timeouts! " << GetLastError() << std::endl;
+		std::cerr << GetLastError() << std::endl;
 		CloseHandle(hDevice);
 		return TIMEOUT_SET_ERROR;
 	}

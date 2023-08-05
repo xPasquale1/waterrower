@@ -16,12 +16,16 @@ struct DataPoint{
 //TODO Tag und Monat brauchen theoretisch nur jeweils ein Byte
 ErrCode saveStatistic(Statistic& statistics, bool override = false){
 	std::fstream file;
-	file.open("data/stats.txt", std::ios::out | std::ios::binary | std::ios::app);
+	file.open("data/stats.txt", std::ios::in | std::ios::out | std::ios::binary);
 	if(!file.is_open()){
 		file.close();
 		return FILE_NOT_FOUND;
 	}
-	if(override) file.seekp(-8);
+	file.seekp(0, std::ios::end);
+	DWORD size = file.tellp();
+	std::cout << file.tellp() << std::endl;
+	if(override) file.seekp(size-8, std::ios::beg);
+	std::cout << file.tellp() << std::endl;
 	char* distance = (char*)(&statistics.distance);
 	file.write(distance, 2);
 	char* time = (char*)(&statistics.time.wDay);
