@@ -306,17 +306,17 @@ void displayDataPage(HWND window){
 	uint total_sec = getSeconds(rowingData.time)+getMinutes(rowingData.time)*60+getHours(rowingData.time)*3600;
 	int time_diff = total_sec-rowingData.last_sec;
 	if(time_diff > 1){
-		rowingData.ms_total = (rowingData.dist-rowingData.last_dist)/time_diff;
+		rowingData.ms_total = ((float)(rowingData.dist-rowingData.last_dist))/time_diff;
 		rowingData.last_sec = total_sec;
 		rowingData.last_dist = rowingData.dist;
 	}
 
-	main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + std::to_string(rowingData.ms_total) + "m/s";
+	main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + floatToString(rowingData.ms_total) + "m/s";
 	float avg_ms = 0;
 	if(total_sec > 0){
 		avg_ms = (float)rowingData.dist/total_sec;
 	}
-	main_page.menus[0]->labels[2].text = "Durchschnittlich: " + float_to_string(avg_ms) + "m/s";
+	main_page.menus[0]->labels[2].text = "Durchschnittlich: " + floatToString(avg_ms) + "m/s";
 	main_page.menus[0]->labels[3].text = "Zeit: " + std::to_string(getHours(rowingData.time)) + ':' + std::to_string(getMinutes(rowingData.time)) + ':' + std::to_string(getSeconds(rowingData.time));
 }
 ErrCode endFreeTraining(){
@@ -536,7 +536,7 @@ void runWorkout(HWND window){
 		if(total_sec > 0){
 			avg_ms = (float)rowingData.dist/total_sec;
 		}
-		main_page.menus[0]->labels[2].text = "Durchschnittlich: " + float_to_string(avg_ms) + "m/s";
+		main_page.menus[0]->labels[2].text = "Durchschnittlich: " + floatToString(avg_ms) + "m/s";
 		WORD hrs = workout->duration/3600;
 		WORD min = (workout->duration/60)%60;
 		WORD sec = workout->duration%60;

@@ -142,7 +142,7 @@ int initCommunication(HANDLE hDevice, BYTE* sendBuffer, BYTE* receiveBuffer){
 
 /* Der Waterrower sollte nicht mit Packeten überlastet werden, daher wird empfohlen nur ca. alle 25ms ein Packet zu senden
    Diese Funktionen senden requests für e.g. Speicherdaten,... indem die Packete in eine Warteschlange eingereiht werden
-   und alle 25ms das Erste gesendet wird
+   und alle 25ms das Älteste gesendet wird
 */
 
 struct Request{
@@ -266,8 +266,8 @@ struct RowingData{
 	WORD last_sec = 0;		//Letzter Zeitpunkt in Sekunden
 	WORD last_dist = 0;		//Letzte Distanz
 
-	WORD ms_total = 0;		//Aktuelle Geschwindigkeit
-	WORD ms_avg = 0;		//Durschnittliche Geschwindigkeit
+	float ms_total = 0;		//Aktuelle Geschwindigkeit
+	float ms_avg = 0;		//Durschnittliche Geschwindigkeit
 	WORD strokes = 0;		//Anzahl der Strokes
 	BYTE stroke_avg = 0;	//Durschnittliche Zeit für einen Stroke
 	BYTE stroke_pull = 0;	//Durschnittliche Zeit für einen Zug (Von Beschleunigung bis Entschleunigung)
@@ -397,11 +397,15 @@ int checkCode(BYTE* receiveBuffer, int length){
 
 	switch(codeToInt2((char*)code)){
 	case(codeToInt2("SS")):{
+#ifndef SILENT
 		printPacket(receiveBuffer, length);
+#endif
 		break;
 	}
 	case(codeToInt2("SE")):{
+#ifndef SILENT
 		printPacket(receiveBuffer, length);
+#endif
 		break;
 	}
 	}
