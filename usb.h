@@ -251,12 +251,18 @@ struct Position{
 	WORD distance;	//Distanz
 };
 
+typedef unsigned long TIMEPOINT;
+
+inline constexpr BYTE getSeconds(TIMEPOINT timepoint){return BYTE(timepoint);}
+inline constexpr void setSeconds(TIMEPOINT* timepoint, BYTE value){*timepoint |= value;}
+inline constexpr BYTE getMinutes(TIMEPOINT timepoint){return BYTE(timepoint>>8);}
+inline constexpr void setMinutes(TIMEPOINT* timepoint, BYTE value){*timepoint |= (value<<8);}
+inline constexpr BYTE getHours(TIMEPOINT timepoint){return BYTE(timepoint>>16);}
+inline constexpr void setHours(TIMEPOINT* timepoint, BYTE value){*timepoint |= (value<<16);}
+
 struct RowingData{
 	WORD dist = 0;			//Distanz zurückgelegt
-	BYTE sec = 0;			//Ruderzeit in Sekunden
-	BYTE min = 0;			//Ruderzeit in Minuten
-	BYTE hrs = 0;			//Ruderzeit in Stunden
-	WORD cur_sec = 0;		//Aktueller Zeitpunkt in Sekunden
+	TIMEPOINT time = 0;		//Ruderzeit
 	WORD last_sec = 0;		//Letzter Zeitpunkt in Sekunden
 	WORD last_dist = 0;		//Letzte Distanz
 
@@ -357,15 +363,15 @@ int checkCode(BYTE* receiveBuffer, int length){
 		}
 		switch(codeToInt3((char*)location)){
 		case codeToInt3("1E1"):{
-			rowingData.sec = strtol((char*)value, 0, 16);
+			setSeconds(&rowingData.time, strtol((char*)value, 0, 16));
 			break;
 		}
 		case codeToInt3("1E2"):{
-			rowingData.min = strtol((char*)value, 0, 16);
+			setMinutes(&rowingData.time, strtol((char*)value, 0, 16));
 			break;
 		}
 		case codeToInt3("1E3"):{
-			rowingData.hrs = strtol((char*)value, 0, 16);
+			setHours(&rowingData.time, strtol((char*)value, 0, 16));
 			break;
 		}
 		case codeToInt3("142"):{

@@ -61,51 +61,11 @@ void refreshData(RequestQueue& queue, WORD interval=250){
 		ErrCheck(addRequest(queue, 1));
 		ErrCheck(addRequest(queue, 2));
 		ErrCheck(addRequest(queue, 3));
-		ErrCheck(addRequest(queue, 8));
 		//TODO sollte wo anders stehen/muss nicht so oft aufgerufen werden!
 		if(!SetThreadExecutionState(ES_DISPLAY_REQUIRED)){
 			std::cerr << "Konnte thread execution status nicht setzen!" << std::endl;
 		}
 	}
-}
-
-void displayDataPage(HWND window){
-#ifndef NO_DEVICE
-		refreshData(queue, 250);
-#endif
-	main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist) + 'm';
-
-	int time_diff = rowingData.cur_sec-rowingData.last_sec;
-	if(time_diff > 1){
-		rowingData.ms_total = (rowingData.dist-rowingData.last_dist)/time_diff;
-		rowingData.last_sec = rowingData.cur_sec;
-		rowingData.last_dist = rowingData.dist;
-	}
-
-	main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + std::to_string(rowingData.ms_total) + "m/s";
-	float avg_ms = 0;
-	uint total_sec = rowingData.sec+rowingData.min*60+rowingData.hrs*3600;
-	rowingData.cur_sec = total_sec;
-	if(total_sec > 0){
-		avg_ms = (float)rowingData.dist/total_sec;
-	}
-	main_page.menus[0]->labels[2].text = "Durchschnittlich: " + float_to_string(avg_ms) + "m/s";
-	main_page.menus[0]->labels[3].text = "Zeit: " + std::to_string(rowingData.hrs) + ':' + std::to_string(rowingData.min) + ':' + std::to_string(rowingData.sec);
-}
-
-void displayStatistics(HWND window){
-	Statistic s[10] = {};
-	DataPoint dps[10];
-	ErrCheck(readStatistics(s, 10));
-	for(int i=0; i < 10; ++i){
-		dps[i].x = i;
-		dps[i].y = s[9-i].distance;
-	}
-	WORD idx = 0;
-	ErrCheck(getWindow(window, idx));
-	WORD width = app.info[idx].window_width/app.info[idx].pixel_size;
-	WORD height = app.info[idx].window_height/app.info[idx].pixel_size;
-	ErrCheck(drawGraph(window, *default_font, width/2-width*0.625/2, height*0.0625, width*0.625, height*0.625, dps, 10));
 }
 
 void renderFunc(HINSTANCE hInstance){
@@ -154,6 +114,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	ErrCheck(loadStartPage(), "laden des Startbildschirms");
 
 	std::thread render_thread(renderFunc, hInstance);
+	while(!app.window_count);
 
 	while(app.window_count){
 #ifndef NO_DEVICE
@@ -171,8 +132,8 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	//Aufräumen
 	destroyPageNoFont(main_page);
 	destroyFont(default_font);
-	strcpy((char*)sendBuffer, "EXIT");
 #ifndef NO_DEVICE
+	strcpy((char*)sendBuffer, "EXIT");
 	sendPacket(hDevice, sendBuffer, sizeof("EXIT")-1);
 	CloseHandle(hDevice);
 #endif
@@ -333,14 +294,31 @@ ErrCode switchToStartPage(HWND window){
 
 	main_page.code = _default_page_function;
 
-#ifndef NO_DEVICE
-	strcpy((char*)sendBuffer, "RESET");
-	sendPacket(hDevice, sendBuffer, sizeof("RESET")-1);
-#endif
-
 	return SUCCESS;
 }
 
+void displayDataPage(HWND window){
+#ifndef NO_DEVICE
+		refreshData(queue, 250);
+#endif
+	main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist) + 'm';
+
+	uint total_sec = getSeconds(rowingData.time)+getMinutes(rowingData.time)*60+getHours(rowingData.time)*3600;
+	int time_diff = total_sec-rowingData.last_sec;
+	if(time_diff > 1){
+		rowingData.ms_total = (rowingData.dist-rowingData.last_dist)/time_diff;
+		rowingData.last_sec = total_sec;
+		rowingData.last_dist = rowingData.dist;
+	}
+
+	main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + std::to_string(rowingData.ms_total) + "m/s";
+	float avg_ms = 0;
+	if(total_sec > 0){
+		avg_ms = (float)rowingData.dist/total_sec;
+	}
+	main_page.menus[0]->labels[2].text = "Durchschnittlich: " + float_to_string(avg_ms) + "m/s";
+	main_page.menus[0]->labels[3].text = "Zeit: " + std::to_string(getHours(rowingData.time)) + ':' + std::to_string(getMinutes(rowingData.time)) + ':' + std::to_string(getSeconds(rowingData.time));
+}
 ErrCode endFreeTraining(){
 	if(rowingData.dist){
 		Statistic s1;
@@ -360,6 +338,11 @@ ErrCode endFreeTraining(){
 }
 ErrCode switchToFreeTrainingPage(HWND window){
 	destroyPageNoFont(main_page);
+
+#ifndef NO_DEVICE
+	strcpy((char*)sendBuffer, "RESET");
+	sendPacket(hDevice, sendBuffer, sizeof("RESET")-1);
+#endif
 
 	WORD idx = 0;
 	ErrCheck(getWindow(window, idx));
@@ -404,6 +387,22 @@ ErrCode switchToFreeTrainingPage(HWND window){
 	return SUCCESS;
 }
 
+void displayStatistics(HWND window){
+	Statistic s[10] = {};
+	DataPoint dps[10];
+	ErrCheck(readStatistics(s, 10));
+	for(int i=0; i < 10; ++i){
+		dps[i].x = i;
+		dps[i].y = s[9-i].distance;
+	}
+	WORD idx = 0;
+	ErrCheck(getWindow(window, idx));
+	WORD width = app.info[idx].window_width/app.info[idx].pixel_size;
+	WORD height = app.info[idx].window_height/app.info[idx].pixel_size;
+	ErrCheck(drawGraph(window, *default_font, width/2-width*0.625/2, height*0.0625, width*0.625, height*0.625, dps, 10));
+	main_page.menus[0]->labels[0].pos = {(int)(width/2-width*0.625/2), (int)(height*0.0625+height*0.625+20)};
+	main_page.menus[0]->labels[0].text = "Wasservolumen: " + std::to_string(rowingData.volume) + '%';
+}
 ErrCode switchToStatistikPage(HWND window){
 	destroyPageNoFont(main_page);
 
@@ -430,8 +429,16 @@ ErrCode switchToStatistikPage(HWND window){
 	menu1->buttons[0].textsize = size.y/2;
 	menu1->button_count = 1;
 
+	WORD w = windowInfo.window_width/windowInfo.pixel_size;
+	WORD label_text_size = w*0.0775;
+	menu1->labels[0].pos = {20, 20};
+	menu1->labels[0].text_size = label_text_size;
+	menu1->label_count = 1;
+
 	main_page.menus[0] = menu1;
 	main_page.menu_count = 1;
+
+	ErrCheck(addRequest(queue, 9));
 
 	main_page.code = displayStatistics;
 
@@ -525,7 +532,7 @@ void runWorkout(HWND window){
 		main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist) + 'm';
 		main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + std::to_string(rowingData.ms_total) + "m/s";
 		float avg_ms = 0;
-		uint total_sec = rowingData.sec+rowingData.min*60+rowingData.hrs*3600;
+		uint total_sec = getSeconds(rowingData.time)+getMinutes(rowingData.time)*60+getHours(rowingData.time)*3600;
 		if(total_sec > 0){
 			avg_ms = (float)rowingData.dist/total_sec;
 		}
@@ -554,6 +561,11 @@ void runWorkout(HWND window){
 ErrCode switchToWorkoutPage(HWND window){
 	destroyPageNoFont(main_page);
 	workout->distance = 0;
+
+#ifndef NO_DEVICE
+	strcpy((char*)sendBuffer, "RESET");
+	sendPacket(hDevice, sendBuffer, sizeof("RESET")-1);
+#endif
 
 	WORD idx = 0;
 	ErrCheck(getWindow(window, idx));
