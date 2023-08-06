@@ -90,7 +90,8 @@ void renderFunc(HINSTANCE hInstance){
 
 INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){
 #ifndef NO_DEVICE
-	for(WORD i=0; i < 10; ++i){
+	//TODO testet nur Port 1-10 für Geräte und auch nicht ob es ein waterrower ist
+	for(WORD i=1; i <= 10; ++i){
 		std::string port = "\\\\.\\COM" + std::to_string(i);
 		if(openDevice(hDevice, port.c_str(), 19200) == SUCCESS){
 			break;
@@ -348,6 +349,13 @@ ErrCode switchToFreeTrainingPage(HWND window){
 	ErrCheck(getWindow(window, idx));
 	WindowInfo& windowInfo = app.info[idx];
 
+	Image* backgroundImage = new Image;
+	ErrCheck(loadImage("textures/basic_dark.tex", *backgroundImage), "Hintergrund image laden");
+	main_page.images[0] = backgroundImage;
+	main_page.imageInfo[0].pos = {0, 0};
+	main_page.imageInfo[0].size = {windowInfo.window_width/windowInfo.pixel_size, windowInfo.window_height/windowInfo.pixel_size};
+	main_page.image_count = 1;
+
 	Menu* menu1 = new Menu;
 
 	Image* buttonImage = new Image;
@@ -410,6 +418,13 @@ ErrCode switchToStatistikPage(HWND window){
 	ErrCheck(getWindow(window, idx));
 	WindowInfo& windowInfo = app.info[idx];
 
+	Image* backgroundImage = new Image;
+	ErrCheck(loadImage("textures/basic_dark.tex", *backgroundImage), "Hintergrund image laden");
+	main_page.images[0] = backgroundImage;
+	main_page.imageInfo[0].pos = {0, 0};
+	main_page.imageInfo[0].size = {windowInfo.window_width/windowInfo.pixel_size, windowInfo.window_height/windowInfo.pixel_size};
+	main_page.image_count = 1;
+
 	Menu* menu1 = new Menu;
 
 	Image* buttonImage = new Image;
@@ -463,6 +478,13 @@ ErrCode switchToCreateWorkoutPage(HWND window){
 	WORD idx = 0;
 	ErrCheck(getWindow(window, idx));
 	WindowInfo& windowInfo = app.info[idx];
+
+	Image* backgroundImage = new Image;
+	ErrCheck(loadImage("textures/basic_dark.tex", *backgroundImage), "Hintergrund image laden");
+	main_page.images[0] = backgroundImage;
+	main_page.imageInfo[0].pos = {0, 0};
+	main_page.imageInfo[0].size = {windowInfo.window_width/windowInfo.pixel_size, windowInfo.window_height/windowInfo.pixel_size};
+	main_page.image_count = 1;
 
 	Menu* menu1 = new Menu;
 
@@ -577,6 +599,13 @@ ErrCode switchToWorkoutPage(HWND window){
 	WORD idx = 0;
 	ErrCheck(getWindow(window, idx));
 	WindowInfo& windowInfo = app.info[idx];
+
+	Image* backgroundImage = new Image;
+	ErrCheck(loadImage("textures/basic_dark.tex", *backgroundImage), "Hintergrund image laden");
+	main_page.images[0] = backgroundImage;
+	main_page.imageInfo[0].pos = {0, 0};
+	main_page.imageInfo[0].size = {windowInfo.window_width/windowInfo.pixel_size, windowInfo.window_height/windowInfo.pixel_size};
+	main_page.image_count = 1;
 
 	Menu* menu1 = new Menu;
 

@@ -293,9 +293,8 @@ constexpr inline int codeToInt2(const char* code){
 	return (code[0]|code[1]<<8);
 }
 
-//TODO idk warum diese Funktion einen Rückgabewert hat
-//ich meine man könnte es als einen Fehler ansehen wenn es den Code nicht gibt...
-int checkCode(BYTE* receiveBuffer, int length){
+//TODO CODE_NOT_FOUND als Fehler ausgeben falls der Code nicht bekannt ist
+ErrCode checkCode(BYTE* receiveBuffer, int length){
 	BYTE code[3]; code[0] = receiveBuffer[0]; code[1] = receiveBuffer[1]; code[2] = receiveBuffer[2];
 	switch(codeToInt3((char*)code)){
 
@@ -415,5 +414,5 @@ int checkCode(BYTE* receiveBuffer, int length){
 		break;
 	}
 	}
-	return 0;
+	return SUCCESS;
 }
