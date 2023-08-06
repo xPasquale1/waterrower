@@ -299,7 +299,7 @@ ErrCode switchToStartPage(HWND window){
 
 void displayDataPage(HWND window){
 #ifndef NO_DEVICE
-		refreshData(queue, 250);
+		refreshData(queue);
 #endif
 	main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist) + 'm';
 
@@ -526,13 +526,20 @@ ErrCode switchToCreateWorkoutPage(HWND window){
 
 void runWorkout(HWND window){
 #ifndef NO_DEVICE
-		refreshData(queue, 250);
+		refreshData(queue);
 #endif
 	if(!updateWorkout(*workout, rowingData.dist - workout->distance)){
 		main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist) + 'm';
-		main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + std::to_string(rowingData.ms_total) + "m/s";
-		float avg_ms = 0;
 		uint total_sec = getSeconds(rowingData.time)+getMinutes(rowingData.time)*60+getHours(rowingData.time)*3600;
+		int time_diff = total_sec-rowingData.last_sec;
+		if(time_diff > 1){
+			rowingData.ms_total = ((float)(rowingData.dist-rowingData.last_dist))/time_diff;
+			rowingData.last_sec = total_sec;
+			rowingData.last_dist = rowingData.dist;
+		}
+
+		main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + floatToString(rowingData.ms_total) + "m/s";
+		float avg_ms = 0;
 		if(total_sec > 0){
 			avg_ms = (float)rowingData.dist/total_sec;
 		}

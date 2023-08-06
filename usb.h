@@ -7,7 +7,7 @@ extern "C"{
 #include <setupapi.h>
 #include "util.h"
 
-//#define SILENT		//Packete werden nicht in den output stream geschrieben
+#define SILENT		//Packete werden nicht in den output stream geschrieben
 //#define SHOW_ERRORS	//Überschreibt SILENT nur für Fehlernachrichten
 
 //ret: Handle für das Gerät
@@ -141,7 +141,7 @@ int initCommunication(HANDLE hDevice, BYTE* sendBuffer, BYTE* receiveBuffer){
 }
 
 /* Der Waterrower sollte nicht mit Packeten überlastet werden, daher wird empfohlen nur ca. alle 25ms ein Packet zu senden
-   Diese Funktionen senden requests für e.g. Speicherdaten,... indem die Packete in eine Warteschlange eingereiht werden
+   Diese Funktionen senden Requests für e.g. Speicherdaten,... indem die Packete in eine Warteschlange eingereiht werden
    und alle 25ms das Älteste gesendet wird
 */
 
@@ -331,7 +331,7 @@ int checkCode(BYTE* receiveBuffer, int length){
 
 	case codeToInt3("IDD"):{	//Doppelter Speicherbereich
 		BYTE value[5]; value[4] = '\0';
-		for(int i=0; i < 2; ++i){
+		for(int i=0; i < 4; ++i){
 			value[i] = receiveBuffer[i+6];
 		}
 		BYTE location[3];
@@ -369,15 +369,15 @@ int checkCode(BYTE* receiveBuffer, int length){
 		}
 		switch(codeToInt3((char*)location)){
 		case codeToInt3("1E1"):{
-			setSeconds(&rowingData.time, strtol((char*)value, 0, 16));
+			setSeconds(&rowingData.time, strtol((char*)value, 0, 10));
 			break;
 		}
 		case codeToInt3("1E2"):{
-			setMinutes(&rowingData.time, strtol((char*)value, 0, 16));
+			setMinutes(&rowingData.time, strtol((char*)value, 0, 10));
 			break;
 		}
 		case codeToInt3("1E3"):{
-			setHours(&rowingData.time, strtol((char*)value, 0, 16));
+			setHours(&rowingData.time, strtol((char*)value, 0, 10));
 			break;
 		}
 		case codeToInt3("142"):{
