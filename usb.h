@@ -7,7 +7,7 @@ extern "C"{
 #include <setupapi.h>
 #include "util.h"
 
-#define SILENT		//Packete werden nicht in den output stream geschrieben
+//#define SILENT		//Packete werden nicht in den output stream geschrieben
 //#define SHOW_ERRORS	//Überschreibt SILENT nur für Fehlernachrichten
 
 //ret: Handle für das Gerät
@@ -254,11 +254,17 @@ struct Position{
 typedef unsigned long TIMEPOINT;
 
 inline constexpr BYTE getSeconds(TIMEPOINT timepoint){return BYTE(timepoint);}
-inline constexpr void setSeconds(TIMEPOINT* timepoint, BYTE value){*timepoint |= value;}
+inline constexpr void setSeconds(TIMEPOINT* timepoint, BYTE value){
+	*timepoint = (*timepoint&0xffffff00)|value;
+}
 inline constexpr BYTE getMinutes(TIMEPOINT timepoint){return BYTE(timepoint>>8);}
-inline constexpr void setMinutes(TIMEPOINT* timepoint, BYTE value){*timepoint |= (value<<8);}
+inline constexpr void setMinutes(TIMEPOINT* timepoint, BYTE value){
+	*timepoint = (*timepoint&0xffff00ff)|(value<<8);
+}
 inline constexpr BYTE getHours(TIMEPOINT timepoint){return BYTE(timepoint>>16);}
-inline constexpr void setHours(TIMEPOINT* timepoint, BYTE value){*timepoint |= (value<<16);}
+inline constexpr void setHours(TIMEPOINT* timepoint, BYTE value){
+	*timepoint = (*timepoint&0xff00ffff)|(value<<16);
+}
 
 struct RowingData{
 	WORD dist = 0;			//Distanz zurückgelegt

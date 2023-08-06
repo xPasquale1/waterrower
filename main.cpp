@@ -11,7 +11,7 @@ extern "C"{
 #include "graphs.h"
 #include "workout.h"
 
-#define NO_DEVICE
+//#define NO_DEVICE
 
 #define FPS 60
 #define FPSMILLIS 1000/FPS
