@@ -62,6 +62,10 @@ void refreshData(RequestQueue& queue, WORD interval=250){
 		ErrCheck(addRequest(queue, 2));
 		ErrCheck(addRequest(queue, 3));
 		ErrCheck(addRequest(queue, 8));
+		//TODO sollte wo anders stehen/muss nicht so oft aufgerufen werden!
+		if(!SetThreadExecutionState(ES_DISPLAY_REQUIRED)){
+			std::cerr << "Konnte thread execution status nicht setzen!" << std::endl;
+		}
 	}
 }
 
@@ -70,9 +74,18 @@ void displayDataPage(HWND window){
 		refreshData(queue, 250);
 #endif
 	main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist) + 'm';
+
+	int time_diff = rowingData.cur_sec-rowingData.last_sec;
+	if(time_diff > 1){
+		rowingData.ms_total = (rowingData.dist-rowingData.last_dist)/time_diff;
+		rowingData.last_sec = rowingData.cur_sec;
+		rowingData.last_dist = rowingData.dist;
+	}
+
 	main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + std::to_string(rowingData.ms_total) + "m/s";
 	float avg_ms = 0;
 	uint total_sec = rowingData.sec+rowingData.min*60+rowingData.hrs*3600;
+	rowingData.cur_sec = total_sec;
 	if(total_sec > 0){
 		avg_ms = (float)rowingData.dist/total_sec;
 	}
@@ -265,6 +278,9 @@ ErrCode handleSignals(HWND window){
 ErrCode switchToStartPage(HWND window){
 	destroyPageNoFont(main_page);
 	destroyWorkout(workout);
+
+	//TODO meh...
+	initRowingData(rowingData);
 
 	WORD idx = 0;
 	ErrCheck(getWindow(window, idx));

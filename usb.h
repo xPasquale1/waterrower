@@ -246,18 +246,31 @@ void transmitRequests(RequestQueue& queue, HANDLE hDevice){
 	}
 }
 
+struct Position{
+	WORD second;	//Zeit seit Beginn der Messung
+	WORD distance;	//Distanz
+};
+
 struct RowingData{
 	WORD dist = 0;			//Distanz zurückgelegt
-	WORD ms_total = 0;		//Aktuelle Beschleunigung
-	WORD ms_avg = 0;		//Durschnittliche Beschleunigung
 	BYTE sec = 0;			//Ruderzeit in Sekunden
 	BYTE min = 0;			//Ruderzeit in Minuten
 	BYTE hrs = 0;			//Ruderzeit in Stunden
+	WORD cur_sec = 0;		//Aktueller Zeitpunkt in Sekunden
+	WORD last_sec = 0;		//Letzter Zeitpunkt in Sekunden
+	WORD last_dist = 0;		//Letzte Distanz
+
+	WORD ms_total = 0;		//Aktuelle Geschwindigkeit
+	WORD ms_avg = 0;		//Durschnittliche Geschwindigkeit
 	WORD strokes = 0;		//Anzahl der Strokes
 	BYTE stroke_avg = 0;	//Durschnittliche Zeit für einen Stroke
 	BYTE stroke_pull = 0;	//Durschnittliche Zeit für einen Zug (Von Beschleunigung bis Entschleunigung)
 	BYTE volume = 0;		//Volumen an Wasser im Wassertank
 }; static RowingData rowingData;
+
+void initRowingData(RowingData& data){
+	data = {0, 0, 0, 0, 0, 0, 0};
+}
 
 //3 Bytes zu int
 constexpr inline int codeToInt3(const char* code){
