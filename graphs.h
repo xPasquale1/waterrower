@@ -23,7 +23,7 @@ ErrCode saveStatistic(Statistic& statistics, bool override = false){
 	}
 	file.seekp(0, std::ios::end);
 	DWORD size = file.tellp();
-	if(override) file.seekp(size-8, std::ios::beg);
+	if(override && size > 7) file.seekp(size-8, std::ios::beg);
 	char* distance = (char*)(&statistics.distance);
 	file.write(distance, 2);
 	char* time = (char*)(&statistics.time.wDay);
