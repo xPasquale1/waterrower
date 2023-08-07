@@ -23,7 +23,7 @@ struct Application{
 	WindowInfo info[MAX_WINDOW_COUNT];	//Fensterinfos
 	uint* pixels[MAX_WINDOW_COUNT];		//Zugehörige Pixeldaten der Fenster
 	WORD window_count = 0;				//Anzahl der Fenster
-	BITMAPINFO bitmapInfo = {};			//TODO eigentlich ist das für jedes Fenster gleich, von daher braucht man kein array
+	BITMAPINFO bitmapInfo = {};			//Bitmapinfo, gleich für alle Fenster!
 }; static Application app;
 
 inline ErrCode getWindow(HWND window, WORD& index){
@@ -132,7 +132,7 @@ ErrCode closeWindow(HWND window){
 			for(WORD j=i; j < app.window_count-1; ++j){
 				app.windows[j] = app.windows[j+1];
 				app.pixels[j] = app.pixels[j+1];
-				app.info[j] = app.info[j+1];	//TODO hier wird einiges kopiert aber das passiert ja eh nicht oft...
+				app.info[j] = app.info[j+1];
 			}
 			app.window_count--;
 			return SUCCESS;
@@ -512,7 +512,7 @@ void destroyButton(Button& button){
 }
 
 inline constexpr bool checkButtonState(Button& button, BUTTONSTATE state){return (button.state&state);}
-//TODO kann bestimmt besser geschrieben werden...
+//TODO kann bestimmt besser geschrieben werden... und ErrCheck aufs Event sollte mit einem BUTTONSTATE entschieden werden
 inline void buttonsClicked(Button* buttons, WORD button_count){
 	for(WORD i=0; i < button_count; ++i){
 		Button& b = buttons[i];
@@ -611,7 +611,6 @@ inline void updateMenu(HWND window, Menu& menu, Font& font){
 			Label& label = menu.labels[i];
 			uint offset = 0;
 			for(size_t j=0; j < label.text.size(); ++j){
-				//TODO error tests wären möglich
 				WORD tmp = font.font_size;
 				font.font_size = label.text_size;
 				offset += drawFontChar(window, font, label.text[j], label.pos.x+offset, label.pos.y);

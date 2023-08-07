@@ -254,26 +254,20 @@ struct Position{
 typedef unsigned long TIMEPOINT;
 
 inline constexpr BYTE getSeconds(TIMEPOINT timepoint){return BYTE(timepoint);}
-inline constexpr void setSeconds(TIMEPOINT* timepoint, BYTE value){
-	*timepoint = (*timepoint&0xffffff00)|value;
-}
+inline constexpr void setSeconds(TIMEPOINT* timepoint, BYTE value){*timepoint = (*timepoint&0xffffff00)|value;}
 inline constexpr BYTE getMinutes(TIMEPOINT timepoint){return BYTE(timepoint>>8);}
-inline constexpr void setMinutes(TIMEPOINT* timepoint, BYTE value){
-	*timepoint = (*timepoint&0xffff00ff)|(value<<8);
-}
+inline constexpr void setMinutes(TIMEPOINT* timepoint, BYTE value){*timepoint = (*timepoint&0xffff00ff)|(value<<8);}
 inline constexpr BYTE getHours(TIMEPOINT timepoint){return BYTE(timepoint>>16);}
-inline constexpr void setHours(TIMEPOINT* timepoint, BYTE value){
-	*timepoint = (*timepoint&0xff00ffff)|(value<<16);
-}
+inline constexpr void setHours(TIMEPOINT* timepoint, BYTE value){*timepoint = (*timepoint&0xff00ffff)|(value<<16);}
 
 struct RowingData{
 	WORD dist = 0;			//Distanz zurückgelegt
 	TIMEPOINT time = 0;		//Ruderzeit
 	WORD last_sec = 0;		//Letzter Zeitpunkt in Sekunden
 	WORD last_dist = 0;		//Letzte Distanz
+	WORD ms_total = 0;		//Aktuelle Geschwindigkeit
+	WORD ms_avg = 0;		//Durschnittliche Geschwindigkeit
 
-	float ms_total = 0;		//Aktuelle Geschwindigkeit
-	float ms_avg = 0;		//Durschnittliche Geschwindigkeit
 	WORD strokes = 0;		//Anzahl der Strokes
 	BYTE stroke_avg = 0;	//Durschnittliche Zeit für einen Stroke
 	BYTE stroke_pull = 0;	//Durschnittliche Zeit für einen Zug (Von Beschleunigung bis Entschleunigung)

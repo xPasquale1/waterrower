@@ -61,6 +61,8 @@ void refreshData(RequestQueue& queue, WORD interval=250){
 		ErrCheck(addRequest(queue, 1));
 		ErrCheck(addRequest(queue, 2));
 		ErrCheck(addRequest(queue, 3));
+		ErrCheck(addRequest(queue, 4));
+		ErrCheck(addRequest(queue, 5));
 		//TODO sollte wo anders stehen/muss nicht so oft aufgerufen werden!
 		if(!SetThreadExecutionState(ES_DISPLAY_REQUIRED)){
 			std::cerr << "Konnte thread execution status nicht setzen!" << std::endl;
@@ -303,21 +305,8 @@ void displayDataPage(HWND window){
 		refreshData(queue);
 #endif
 	main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist) + 'm';
-
-	uint total_sec = getSeconds(rowingData.time)+getMinutes(rowingData.time)*60+getHours(rowingData.time)*3600;
-	int time_diff = total_sec-rowingData.last_sec;
-	if(time_diff > 1){
-		rowingData.ms_total = ((float)(rowingData.dist-rowingData.last_dist))/time_diff;
-		rowingData.last_sec = total_sec;
-		rowingData.last_dist = rowingData.dist;
-	}
-
-	main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + floatToString(rowingData.ms_total) + "m/s";
-	float avg_ms = 0;
-	if(total_sec > 0){
-		avg_ms = (float)rowingData.dist/total_sec;
-	}
-	main_page.menus[0]->labels[2].text = "Durchschnittlich: " + floatToString(avg_ms) + "m/s";
+	main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + wordToString(rowingData.ms_total) + "m/s";
+	main_page.menus[0]->labels[2].text = "Durchschnittlich: " + wordToString(rowingData.ms_avg) + "m/s";
 	main_page.menus[0]->labels[3].text = "Zeit: " + std::to_string(getHours(rowingData.time)) + ':' + std::to_string(getMinutes(rowingData.time)) + ':' + std::to_string(getSeconds(rowingData.time));
 }
 ErrCode endFreeTraining(){
@@ -409,7 +398,7 @@ void displayStatistics(HWND window){
 	WORD height = app.info[idx].window_height/app.info[idx].pixel_size;
 	ErrCheck(drawGraph(window, *default_font, width/2-width*0.625/2, height*0.0625, width*0.625, height*0.625, dps, 10));
 	main_page.menus[0]->labels[0].pos = {(int)(width/2-width*0.625/2), (int)(height*0.0625+height*0.625+20)};
-	main_page.menus[0]->labels[0].text = "Wasservolumen: " + std::to_string(rowingData.volume) + '%';
+	main_page.menus[0]->labels[0].text = "Wasservolumen: " + wordToString(rowingData.volume) + 'L';
 }
 ErrCode switchToStatistikPage(HWND window){
 	destroyPageNoFont(main_page);
@@ -466,7 +455,7 @@ ErrCode incWorkoutTime(){
 	return SUCCESS;
 }
 ErrCode decWorkoutTime(){
-	if(workout->duration > 0) workout->duration -= 60;
+	if(workout->duration > 60) workout->duration -= 60;
 	main_page.menus[0]->labels[0].text = "Dauer: " + std::to_string(workout->duration/60) + "min";
 	return SUCCESS;
 }
@@ -474,6 +463,7 @@ ErrCode switchToCreateWorkoutPage(HWND window){
 	destroyPageNoFont(main_page);
 	destroyWorkout(workout);
 	createWorkout(workout);
+	workout->duration = 60;
 
 	WORD idx = 0;
 	ErrCheck(getWindow(window, idx));
@@ -516,7 +506,7 @@ ErrCode switchToCreateWorkoutPage(HWND window){
 
 	pos = {(int)(windowInfo.window_width/windowInfo.pixel_size*0.125), (int)(windowInfo.window_height/windowInfo.pixel_size*0.125)};
 	menu1->labels[0].pos = {pos.x, pos.y};
-	menu1->labels[0].text = "Dauer: " + std::to_string(workout->duration) + "min";
+	menu1->labels[0].text = "Dauer: " + std::to_string(workout->duration/60) + "min";
 	menu1->labels[0].text_size = 31;
 	pos.x += (int)(windowInfo.window_width/windowInfo.pixel_size*0.375);
 	menu1->buttons[2].pos = {pos.x, pos.y};
@@ -541,7 +531,7 @@ ErrCode switchToCreateWorkoutPage(HWND window){
 	main_page.menus[0] = menu1;
 	main_page.menu_count = 1;
 
-//	main_page.code = ;
+	main_page.code = _default_page_function;
 
 	return SUCCESS;
 }
@@ -552,20 +542,8 @@ void runWorkout(HWND window){
 #endif
 	if(!updateWorkout(*workout, rowingData.dist - workout->distance)){
 		main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist) + 'm';
-		uint total_sec = getSeconds(rowingData.time)+getMinutes(rowingData.time)*60+getHours(rowingData.time)*3600;
-		int time_diff = total_sec-rowingData.last_sec;
-		if(time_diff > 1){
-			rowingData.ms_total = ((float)(rowingData.dist-rowingData.last_dist))/time_diff;
-			rowingData.last_sec = total_sec;
-			rowingData.last_dist = rowingData.dist;
-		}
-
-		main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + floatToString(rowingData.ms_total) + "m/s";
-		float avg_ms = 0;
-		if(total_sec > 0){
-			avg_ms = (float)rowingData.dist/total_sec;
-		}
-		main_page.menus[0]->labels[2].text = "Durchschnittlich: " + floatToString(avg_ms) + "m/s";
+		main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + wordToString(rowingData.ms_total) + "m/s";
+		main_page.menus[0]->labels[2].text = "Durchschnittlich: " + wordToString(rowingData.ms_avg) + "m/s";
 		WORD hrs = workout->duration/3600;
 		WORD min = (workout->duration/60)%60;
 		WORD sec = workout->duration%60;

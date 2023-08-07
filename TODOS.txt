@@ -1,5 +1,5 @@
 Man kann eine Dezimalstelle .x für die  Distanz auslesen
-Double locations sollten jetzt korrekt ausgelesen werden -> die Daten auch nutzen
 Mehr nützliche Daten auslesen können
 RowingData struct wird relativ groß wegen alignment, daher wie bei der Zeit Daten zusammenlegen in eine Variable
 Beim öffnen des Geräts kann einiges schief gehen, die gängigsten Fehler von GetLastError sollten in ErrCodes aufgenommen werden
+Workout erstellen die einem sagen ob schneller oder langsamer

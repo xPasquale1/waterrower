@@ -90,9 +90,14 @@ inline constexpr void setButton(Mouse& mouse, MOUSEBUTTON button){mouse.button |
 inline constexpr void resetButton(Mouse& mouse, MOUSEBUTTON button){mouse.button &= ~button;}
 
 inline std::string floatToString(float value, BYTE decimals=2){
-	WORD precision = pow(10, decimals);	//TODO könnte constexpr sein...
+	WORD precision = pow(10, decimals);
 	DWORD val = value * precision;
 	return std::to_string(val/precision) + '.' + std::to_string(val%precision);
+}
+
+inline std::string wordToString(WORD value, BYTE decimals=2){
+	WORD precision = pow(10, decimals);
+	return std::to_string(value/precision) + '.' + std::to_string(value%precision);
 }
 
 enum KEYBOARDBUTTON : unsigned long long{
