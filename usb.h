@@ -158,13 +158,17 @@ struct RequestQueue{
 	WORD request_ptr2 = 0;
 };
 
+//TODO für alle machen und unten einfügen
+#define DISTANCECODE "054"
+#define DISTANCELOCATION "IRT054"
+
 //Fügt eine request in die Warteschlange ein, id gibt die request an
 ErrCode addRequest(RequestQueue& queue, DWORD id){
 	if((queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE) == queue.request_ptr2) return QUEUE_FULL;	//Warteschlange voll
 	switch(id){
 	case 0:{	//Distanzabfrage
-		strcpy((char*)queue.requests[queue.request_ptr1].data, "IRT057");
-		queue.requests[queue.request_ptr1].length = sizeof("IRT057")-1;
+		strcpy((char*)queue.requests[queue.request_ptr1].data, "IRT054");
+		queue.requests[queue.request_ptr1].length = sizeof("IRT054")-1;
 		queue.request_ptr1 = (queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE);
 		return SUCCESS;
 	}
@@ -222,6 +226,12 @@ ErrCode addRequest(RequestQueue& queue, DWORD id){
 		queue.request_ptr1 = (queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE);
 		return SUCCESS;
 	}
+	case 10:{	//Gesamte Zeit auf einmal (Sekuden + Minuten + Stunden)
+		strcpy((char*)queue.requests[queue.request_ptr1].data, "IRT1E1");
+		queue.requests[queue.request_ptr1].length = sizeof("IRT1E1")-1;
+		queue.request_ptr1 = (queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE);
+		return SUCCESS;
+	}
 	}
 	return REQUEST_NOT_FOUND;
 }
@@ -251,18 +261,20 @@ struct Position{
 	WORD distance;	//Distanz
 };
 
-typedef unsigned long TIMEPOINT;
+struct Timepoint{
+	BYTE sec;
+	BYTE min;
+	BYTE hrs;
+};
 
-inline constexpr BYTE getSeconds(TIMEPOINT timepoint){return BYTE(timepoint);}
-inline constexpr void setSeconds(TIMEPOINT* timepoint, BYTE value){*timepoint = (*timepoint&0xffffff00)|value;}
-inline constexpr BYTE getMinutes(TIMEPOINT timepoint){return BYTE(timepoint>>8);}
-inline constexpr void setMinutes(TIMEPOINT* timepoint, BYTE value){*timepoint = (*timepoint&0xffff00ff)|(value<<8);}
-inline constexpr BYTE getHours(TIMEPOINT timepoint){return BYTE(timepoint>>16);}
-inline constexpr void setHours(TIMEPOINT* timepoint, BYTE value){*timepoint = (*timepoint&0xff00ffff)|(value<<16);}
+struct Distance{
+	BYTE lower;
+	WORD upper;
+};
 
 struct RowingData{
-	WORD dist = 0;			//Distanz zurückgelegt
-	TIMEPOINT time = 0;		//Ruderzeit
+	Distance dist = {0};	//Distanz zurückgelegt, Byte 0 ist die .x Distanz, Byte 1-2 sind die Distanz in Meter
+	Timepoint time = {0};	//Ruderzeit
 	WORD last_sec = 0;		//Letzter Zeitpunkt in Sekunden
 	WORD last_dist = 0;		//Letzte Distanz
 	WORD ms_total = 0;		//Aktuelle Geschwindigkeit
@@ -311,9 +323,19 @@ ErrCode checkCode(BYTE* receiveBuffer, int length){
 			location[i] = receiveBuffer[i+3];
 		}
 		switch(codeToInt3((char*)location)){
-		case codeToInt3("057"):{
-			rowingData.dist = strtol((char*)value, 0, 16);
-			break;
+		case codeToInt3("054"):{	//Das hier ist speziell
+			rowingData.dist.upper = strtol((char*)value+2, 0, 16);
+			value[2] = '\0';
+			rowingData.dist.lower = strtol((char*)value, 0, 16);
+			return SUCCESS;
+		}
+		case codeToInt3("1E1"):{	//Das hier ist auch speziell
+			rowingData.time.hrs = strtol((char*)value+4, 0, 16);
+			value[4] = '\0';
+			rowingData.time.min = strtol((char*)value+2, 0, 16);
+			value[2] = '\0';
+			rowingData.time.sec = strtol((char*)value, 0, 16);
+			return SUCCESS;
 		}
 		}
 #ifndef SILENT
@@ -334,15 +356,15 @@ ErrCode checkCode(BYTE* receiveBuffer, int length){
 		switch(codeToInt3((char*)location)){
 		case codeToInt3("148"):{
 			rowingData.ms_total = strtol((char*)value, 0, 16);
-			break;
+			return SUCCESS;
 		}
 		case codeToInt3("14A"):{
 			rowingData.ms_avg = strtol((char*)value, 0, 16);
-			break;
+			return SUCCESS;
 		}
 		case codeToInt3("140"):{
 			rowingData.strokes = strtol((char*)value, 0, 16);
-			break;
+			return SUCCESS;
 		}
 		}
 #ifndef SILENT
@@ -362,28 +384,28 @@ ErrCode checkCode(BYTE* receiveBuffer, int length){
 		}
 		switch(codeToInt3((char*)location)){
 		case codeToInt3("1E1"):{
-			setSeconds(&rowingData.time, strtol((char*)value, 0, 10));
-			break;
+			rowingData.time.sec = strtol((char*)value, 0, 10);
+			return SUCCESS;
 		}
 		case codeToInt3("1E2"):{
-			setMinutes(&rowingData.time, strtol((char*)value, 0, 10));
-			break;
+			rowingData.time.min = strtol((char*)value, 0, 10);
+			return SUCCESS;
 		}
 		case codeToInt3("1E3"):{
-			setHours(&rowingData.time, strtol((char*)value, 0, 10));
-			break;
+			rowingData.time.hrs = strtol((char*)value, 0, 10);
+			return SUCCESS;
 		}
 		case codeToInt3("142"):{
 			rowingData.stroke_avg = strtol((char*)value, 0, 16);
-			break;
+			return SUCCESS;
 		}
 		case codeToInt3("143"):{
 			rowingData.stroke_pull = strtol((char*)value, 0, 16);
-			break;
+			return SUCCESS;
 		}
 		case codeToInt3("0A9"):{
 			rowingData.volume = strtol((char*)value, 0, 16);
-			break;
+			return SUCCESS;
 		}
 		}
 #ifndef SILENT
@@ -408,5 +430,5 @@ ErrCode checkCode(BYTE* receiveBuffer, int length){
 		break;
 	}
 	}
-	return SUCCESS;
+	return CODE_NOT_FOUND;
 }

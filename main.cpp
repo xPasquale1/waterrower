@@ -58,9 +58,7 @@ void refreshData(RequestQueue& queue, WORD interval=250){
 	if(newmilli - currentmilli > interval){
 		last_request_tp2 = systemTime;
 		ErrCheck(addRequest(queue, 0));
-		ErrCheck(addRequest(queue, 1));
-		ErrCheck(addRequest(queue, 2));
-		ErrCheck(addRequest(queue, 3));
+		ErrCheck(addRequest(queue, 10));
 		ErrCheck(addRequest(queue, 4));
 		ErrCheck(addRequest(queue, 5));
 		//TODO sollte wo anders stehen/muss nicht so oft aufgerufen werden!
@@ -304,15 +302,15 @@ void displayDataPage(HWND window){
 #ifndef NO_DEVICE
 		refreshData(queue);
 #endif
-	main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist) + 'm';
+	main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist.upper) + '.' + std::to_string(rowingData.dist.lower) + 'm';
 	main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + wordToString(rowingData.ms_total) + "m/s";
 	main_page.menus[0]->labels[2].text = "Durchschnittlich: " + wordToString(rowingData.ms_avg) + "m/s";
-	main_page.menus[0]->labels[3].text = "Zeit: " + std::to_string(getHours(rowingData.time)) + ':' + std::to_string(getMinutes(rowingData.time)) + ':' + std::to_string(getSeconds(rowingData.time));
+	main_page.menus[0]->labels[3].text = "Zeit: " + std::to_string(rowingData.time.hrs) + ':' + std::to_string(rowingData.time.min) + ':' + std::to_string(rowingData.time.sec);
 }
 ErrCode endFreeTraining(){
-	if(rowingData.dist){
+	if(rowingData.dist.upper){
 		Statistic s1;
-		s1.distance = rowingData.dist;
+		s1.distance = rowingData.dist.upper;
 		GetSystemTime(&s1.time);
 		Statistic s2;
 		readStatistics(&s2, 1);
@@ -540,8 +538,8 @@ void runWorkout(HWND window){
 #ifndef NO_DEVICE
 		refreshData(queue);
 #endif
-	if(!updateWorkout(*workout, rowingData.dist - workout->distance)){
-		main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist) + 'm';
+	if(!updateWorkout(*workout, rowingData.dist.upper - workout->distance)){
+		main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist.upper) + '.' + std::to_string(rowingData.dist.lower) + 'm';
 		main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + wordToString(rowingData.ms_total) + "m/s";
 		main_page.menus[0]->labels[2].text = "Durchschnittlich: " + wordToString(rowingData.ms_avg) + "m/s";
 		WORD hrs = workout->duration/3600;

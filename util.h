@@ -25,7 +25,8 @@ enum ErrCode{
 	INVALID_WORKOUT,
 	INVALID_USB_HANDLE,
 	COMMSTATE_ERROR,
-	TIMEOUT_SET_ERROR
+	TIMEOUT_SET_ERROR,
+	CODE_NOT_FOUND
 };
 enum ErrCodeFlags{
 	ERR_NO_FLAG = 0,
@@ -71,6 +72,9 @@ inline ErrCode ErrCheck(ErrCode code, const char* msg="\0", ErrCodeFlags flags=E
 	case TIMEOUT_SET_ERROR:
 		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[TIMEOUT_SET_ERROR ERROR] " << msg << std::endl;
 		return TIMEOUT_SET_ERROR;
+	case CODE_NOT_FOUND:
+		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[CODE_NOT_FOUND ERROR] " << msg << std::endl;
+		return CODE_NOT_FOUND;
 	default: return SUCCESS;
 	}
 	return SUCCESS;

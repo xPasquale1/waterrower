@@ -1,5 +1,5 @@
-Man kann eine Dezimalstelle .x für die  Distanz auslesen
 Mehr nützliche Daten auslesen können
-RowingData struct wird relativ groß wegen alignment, daher wie bei der Zeit Daten zusammenlegen in eine Variable
 Beim öffnen des Geräts kann einiges schief gehen, die gängigsten Fehler von GetLastError sollten in ErrCodes aufgenommen werden
-Workout erstellen die einem sagen ob schneller oder langsamer
+Workouts erstellen die einem sagen ob schneller oder langsamer
+Die Distanz könnte ja auf 3Byte erweitert werden, da 65km max. doch relativ klein ist
+Video abspielen oder virtuelle Welt erzeugen
