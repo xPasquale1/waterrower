@@ -324,17 +324,17 @@ ErrCode checkCode(BYTE* receiveBuffer, int length){
 		}
 		switch(codeToInt3((char*)location)){
 		case codeToInt3("054"):{	//Das hier ist speziell
-			rowingData.dist.upper = strtol((char*)value+2, 0, 16);
-			value[2] = '\0';
-			rowingData.dist.lower = strtol((char*)value, 0, 16);
+			rowingData.dist.lower = strtol((char*)value+2, 0, 16);
+			value[4] = '\0';
+			rowingData.dist.upper = strtol((char*)value, 0, 16);
 			return SUCCESS;
 		}
 		case codeToInt3("1E1"):{	//Das hier ist auch speziell
-			rowingData.time.hrs = strtol((char*)value+4, 0, 16);
+			rowingData.time.sec = strtol((char*)value+4, 0, 10);
 			value[4] = '\0';
-			rowingData.time.min = strtol((char*)value+2, 0, 16);
+			rowingData.time.min = strtol((char*)value+2, 0, 10);
 			value[2] = '\0';
-			rowingData.time.sec = strtol((char*)value, 0, 16);
+			rowingData.time.hrs = strtol((char*)value, 0, 10);
 			return SUCCESS;
 		}
 		}
