@@ -6,8 +6,8 @@
 
 #include "util.h"
 
-#define WINDOWSTATETYPE BYTE
-enum WINDOWSTATE : WINDOWSTATETYPE{
+#define WINDOWFLAGSTYPE BYTE
+enum WINDOWFLAGS : WINDOWFLAGSTYPE{
 	WINDOW_CLOSE = 1,
 	WINDOW_RESIZE = 2
 };
@@ -15,16 +15,26 @@ struct WindowInfo{
 	WORD window_width = 800;
 	WORD window_height = 800;
 	WORD pixel_size = 1;
-	WINDOWSTATETYPE state;			//Zustand des Fensters (können mehrere sein)
+	WINDOWFLAGSTYPE flags;			//Zustand des Fensters (können mehrere sein)
+};
+
+#define APPLICATIONFLAGSTYPE BYTE
+enum APPLICATIONFLAGS : APPLICATIONFLAGSTYPE{
+	APP_RUNNING = 1
 };
 #define MAX_WINDOW_COUNT 10
 struct Application{
-	HWND windows[MAX_WINDOW_COUNT];		//Fenster handles der app
-	WindowInfo info[MAX_WINDOW_COUNT];	//Fensterinfos
-	uint* pixels[MAX_WINDOW_COUNT];		//Zugehörige Pixeldaten der Fenster
-	WORD window_count = 0;				//Anzahl der Fenster
-	BITMAPINFO bitmapInfo = {};			//Bitmapinfo, gleich für alle Fenster!
+	HWND windows[MAX_WINDOW_COUNT];				//Fenster handles der app
+	WindowInfo info[MAX_WINDOW_COUNT];			//Fensterinfos
+	uint* pixels[MAX_WINDOW_COUNT];				//Zugehörige Pixeldaten der Fenster
+	WORD window_count = 0;						//Anzahl der Fenster
+	BITMAPINFO bitmapInfo = {};					//Bitmapinfo, gleich für alle Fenster!
+	APPLICATIONFLAGSTYPE flags = APP_RUNNING;	//Applikationsflags
 }; static Application app;
+
+inline bool getAppFlag(APPLICATIONFLAGS flag){return(app.flags & flag);}
+inline void setAppFlag(APPLICATIONFLAGS flag){app.flags |= flag;}
+inline void resetAppFlag(APPLICATIONFLAGS flag){app.flags &= ~flag;}
 
 inline ErrCode getWindow(HWND window, WORD& index){
 	for(WORD i=0; i < app.window_count; ++i){
@@ -35,38 +45,36 @@ inline ErrCode getWindow(HWND window, WORD& index){
 	}
 	return WINDOW_NOT_FOUND;
 }
-
-inline ErrCode setWindowState(HWND window, WINDOWSTATE state){
+inline ErrCode setWindowState(HWND window, WINDOWFLAGS state){
 	ErrCode code; WORD idx;
 	code = getWindow(window, idx);
 	if(code) return code;
-	app.info[idx].state |= state;
+	app.info[idx].flags |= state;
 	return SUCCESS;
 }
-
-inline ErrCode resetWindowState(HWND window, WINDOWSTATE state){
+inline ErrCode resetWindowState(HWND window, WINDOWFLAGS state){
 	ErrCode code; WORD idx;
 	code = getWindow(window, idx);
 	if(code) return code;
-	app.info[idx].state &= ~state;
+	app.info[idx].flags &= ~state;
 	return SUCCESS;
 }
 
 //TODO Fehler melden
-inline bool getWindowState(HWND window, WINDOWSTATE state){
+inline bool getWindowState(HWND window, WINDOWFLAGS state){
 	WORD idx;
 	getWindow(window, idx);
-	return (app.info[idx].state & state);
+	return (app.info[idx].flags & state);
 }
 
 //TODO Fehler melden
 //Gibt den nächsten Zustand des Fensters zurück, Anwendung z.B. while(getNextWindowState())...
-inline WINDOWSTATE getNextWindowState(HWND window){
+inline WINDOWFLAGS getNextWindowState(HWND window){
 	WORD idx = 0;
 	getWindow(window, idx);
-	WINDOWSTATETYPE state = app.info[idx].state & -app.info[idx].state;
-	app.info[idx].state &= ~state;
-	return (WINDOWSTATE)state;
+	APPLICATIONFLAGSTYPE state = app.info[idx].flags & -app.info[idx].flags;
+	app.info[idx].flags &= ~state;
+	return (WINDOWFLAGS)state;
 }
 
 inline ErrCode resizeWindow(HWND window, WORD width, WORD height, WORD pixel_size){
@@ -489,7 +497,7 @@ void destroyFont(Font*& font){
 }
 
 ErrCode _defaultEvent(void){return SUCCESS;}
-enum BUTTONSTATE{
+enum BUTTONFLAGS{
 	BUTTON_VISIBLE=1, BUTTON_CAN_HOVER=2, BUTTON_HOVER=4, BUTTON_PRESSED=8, BUTTON_TEXT_CENTER
 };
 struct Button{
@@ -500,7 +508,7 @@ struct Button{
 	ivec2 repos = {0, 0};
 	ivec2 size = {50, 10};
 	ivec2 resize = {55, 11};
-	BYTE state = BUTTON_VISIBLE | BUTTON_CAN_HOVER | BUTTON_TEXT_CENTER;
+	BYTE flags = BUTTON_VISIBLE | BUTTON_CAN_HOVER | BUTTON_TEXT_CENTER;
 	uint color = RGBA(120, 120, 120);
 	uint hover_color = RGBA(120, 120, 255);
 	uint textcolor = RGBA(180, 180, 180);
@@ -511,7 +519,7 @@ void destroyButton(Button& button){
 	delete[] button.image;	//nullptr check sollte nicht nötig sein
 }
 
-inline constexpr bool checkButtonState(Button& button, BUTTONSTATE state){return (button.state&state);}
+inline constexpr bool checkButtonState(Button& button, BUTTONFLAGS state){return (button.flags&state);}
 //TODO kann bestimmt besser geschrieben werden... und ErrCheck aufs Event sollte mit einem BUTTONSTATE entschieden werden
 inline void buttonsClicked(Button* buttons, WORD button_count){
 	for(WORD i=0; i < button_count; ++i){
@@ -519,14 +527,14 @@ inline void buttonsClicked(Button* buttons, WORD button_count){
 		if(!checkButtonState(b, BUTTON_VISIBLE)) continue;
 		ivec2 delta = {mouse.pos.x - b.pos.x, mouse.pos.y - b.pos.y};
 		if(delta.x >= 0 && delta.x <= b.size.x && delta.y >= 0 && delta.y <= b.size.y){
-			if(checkButtonState(b, BUTTON_CAN_HOVER)) b.state |= BUTTON_HOVER;
+			if(checkButtonState(b, BUTTON_CAN_HOVER)) b.flags |= BUTTON_HOVER;
 			if(getButton(mouse, MOUSE_LMB) && !checkButtonState(b, BUTTON_PRESSED)){
 				ErrCheck(b.event());
-				b.state |= BUTTON_PRESSED;
+				b.flags |= BUTTON_PRESSED;
 			}
-			else if(!getButton(mouse, MOUSE_LMB)) b.state &= ~BUTTON_PRESSED;
+			else if(!getButton(mouse, MOUSE_LMB)) b.flags &= ~BUTTON_PRESSED;
 		}else if(checkButtonState(b, BUTTON_CAN_HOVER)){
-			b.state &= ~BUTTON_HOVER;
+			b.flags &= ~BUTTON_HOVER;
 		}
 	}
 }
@@ -580,7 +588,7 @@ struct Label{
 	WORD text_size = 2;
 };
 
-enum MENUSTATE{
+enum MENUFLAGS{
 	MENU_OPEN=1, MENU_OPEN_TOGGLE=2
 };
 #define MAX_BUTTONS 10
@@ -591,7 +599,7 @@ struct Menu{
 	WORD image_count = 0;
 	Button buttons[MAX_BUTTONS];
 	WORD button_count = 0;
-	BYTE state = MENU_OPEN;	//Bits: offen, toggle bit für offen, Rest ungenutzt
+	BYTE flags = MENU_OPEN;	//Bits: offen, toggle bit für offen, Rest ungenutzt
 	ivec2 pos = {};			//TODO Position in Bildschirmpixelkoordinaten
 	Label labels[MAX_STRINGS];
 	WORD label_count = 0;
@@ -603,7 +611,7 @@ void destroyMenu(Menu& menu){
 	}
 }
 
-inline constexpr bool checkMenuState(Menu& menu, MENUSTATE state){return (menu.state&state);}
+inline constexpr bool checkMenuState(Menu& menu, MENUFLAGS state){return (menu.flags&state);}
 inline void updateMenu(HWND window, Menu& menu, Font& font){
 	if(checkMenuState(menu, MENU_OPEN)){
 		updateButtons(window, font, menu.buttons, menu.button_count);

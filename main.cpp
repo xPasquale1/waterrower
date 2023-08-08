@@ -61,8 +61,8 @@ void refreshData(RequestQueue& queue, WORD interval=250){
 		ErrCheck(addRequest(queue, 10));
 		ErrCheck(addRequest(queue, 4));
 		ErrCheck(addRequest(queue, 5));
-		//TODO sollte wo anders stehen/muss nicht so oft aufgerufen werden!
-		if(!SetThreadExecutionState(ES_DISPLAY_REQUIRED)){
+		//TODO kann einmalig mit ES_CONTINUOUS | ... aufgerufen werden und danach wieder ES_CONTINUOUS gelöscht werden
+		if(!SetThreadExecutionState(ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED)){
 			std::cerr << "Konnte thread execution status nicht setzen!" << std::endl;
 		}
 	}
@@ -71,9 +71,10 @@ void refreshData(RequestQueue& queue, WORD interval=250){
 void renderFunc(HINSTANCE hInstance){
 	HWND main_window;
 	if(ErrCheck(openWindow(hInstance, 800, 800, 1, main_window, "waterrower", main_window_callback), "open main window") != SUCCESS){
+		resetAppFlag(APP_RUNNING);
 		return;
 	};
-	while(app.window_count){
+	while(getAppFlag(APP_RUNNING)){
 		SYSTEMTIME t1;
 		GetSystemTime(&t1);
 		ErrCheck(clearWindow(main_window), "clear window");
@@ -113,11 +114,11 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	main_page.font = default_font;
 
 	ErrCheck(loadStartPage(), "laden des Startbildschirms");
+	setAppFlag(APP_RUNNING);
 
 	std::thread render_thread(renderFunc, hInstance);
-	while(!app.window_count);
 
-	while(app.window_count){
+	while(getAppFlag(APP_RUNNING)){
 #ifndef NO_DEVICE
 		transmitRequests(queue, hDevice);
 
@@ -199,11 +200,12 @@ ErrCode handleSignals(HWND window){
 	getMessages();
 	for(WORD i=0; i < app.window_count; ++i){
 		HWND windowIter = app.windows[i];
-		WINDOWSTATE state;
+		WINDOWFLAGS state;
 		while((state = getNextWindowState(windowIter))){
 			switch(state){
 			case WINDOW_CLOSE:
 				closeWindow(windowIter);
+				if(app.window_count == 0) resetAppFlag(APP_RUNNING);
 				break;
 			case WINDOW_RESIZE:
 				setPageFlag(main_page, PAGE_LOAD);
