@@ -3,7 +3,8 @@
 #include "util.h"
 
 enum WORKOUTFLAGS{
-	WORKOUT_DONE = 1
+	WORKOUT_DONE = 1,
+	WORKOUT_INTENSITY = 2
 };
 
 struct Workout{
@@ -11,6 +12,7 @@ struct Workout{
 	SYSTEMTIME last_time;	//Start-Zeitpunkt
 	long duration = 0;		//in Sekunden
 	WORD distance = 0;		//Ruderweite
+	WORD intensity = 0;		//Gewünschte Intensität
 	BYTE flags = 0;			//Flags
 };
 

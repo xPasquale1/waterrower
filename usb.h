@@ -161,6 +161,12 @@ struct RequestQueue{
 //TODO für alle machen und unten einfügen
 #define DISTANCECODE "054"
 #define DISTANCELOCATION "IRT054"
+#define SECONDSCODE "1E1"
+#define SECONDSLOCATION "IRS1E1"
+#define MINUTESCODE "1E2"
+#define MINUTESLOCATION "IRS1E2"
+#define HOURSCODE "1E3"
+#define HOURSLOCATION "IRS1E3"
 
 //Fügt eine request in die Warteschlange ein, id gibt die request an
 ErrCode addRequest(RequestQueue& queue, DWORD id){
@@ -299,7 +305,6 @@ constexpr inline int codeToInt2(const char* code){
 	return (code[0]|code[1]<<8);
 }
 
-//TODO CODE_NOT_FOUND als Fehler ausgeben falls der Code nicht bekannt ist
 ErrCode checkCode(BYTE* receiveBuffer, int length){
 	BYTE code[3]; code[0] = receiveBuffer[0]; code[1] = receiveBuffer[1]; code[2] = receiveBuffer[2];
 	switch(codeToInt3((char*)code)){

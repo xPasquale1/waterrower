@@ -459,6 +459,18 @@ ErrCode decWorkoutTime(){
 	main_page.menus[0]->labels[0].text = "Dauer: " + std::to_string(workout->duration/60) + "min";
 	return SUCCESS;
 }
+ErrCode incIntensityTime(){
+	workout->intensity += 10;
+	setWorkoutFlag(*workout, WORKOUT_INTENSITY);
+	main_page.menus[0]->labels[1].text = "Zielgeschw.: " + wordToString(workout->intensity) + "m/s";
+	return SUCCESS;
+}
+ErrCode decIntensityTime(){
+	if(workout->intensity >= 10) workout->intensity -= 10;
+	if(workout->intensity == 0) resetWorkoutFlag(*workout, WORKOUT_INTENSITY);
+	main_page.menus[0]->labels[1].text = "Zielgeschw.: " + wordToString(workout->intensity) + "m/s";
+	return SUCCESS;
+}
 ErrCode switchToCreateWorkoutPage(HWND window){
 	destroyPageNoFont(main_page);
 	destroyWorkout(workout);
@@ -502,12 +514,18 @@ ErrCode switchToCreateWorkoutPage(HWND window){
 	menu1->buttons[1].text = "Starte Workout";
 	menu1->buttons[1].image = buttonImage;
 	menu1->buttons[1].textsize = size.y/2;
-	menu1->button_count = 4;
+	menu1->button_count = 6;
 
+	WORD w = windowInfo.window_width/windowInfo.pixel_size;
+	WORD label_text_size = w*0.038;
 	pos = {(int)(windowInfo.window_width/windowInfo.pixel_size*0.125), (int)(windowInfo.window_height/windowInfo.pixel_size*0.125)};
 	menu1->labels[0].pos = {pos.x, pos.y};
 	menu1->labels[0].text = "Dauer: " + std::to_string(workout->duration/60) + "min";
-	menu1->labels[0].text_size = 31;
+	menu1->labels[0].text_size = label_text_size;
+	menu1->labels[1].pos = {pos.x, pos.y+size.y+(int)(windowInfo.window_height/windowInfo.pixel_size*0.0125)};
+	menu1->labels[1].text = "Zielgeschw.: " + wordToString(workout->intensity) + "m/s";
+	menu1->labels[1].text_size = label_text_size;
+	menu1->label_count = 2;
 	pos.x += (int)(windowInfo.window_width/windowInfo.pixel_size*0.375);
 	menu1->buttons[2].pos = {pos.x, pos.y};
 	menu1->buttons[2].size = {size.y, size.y};
@@ -526,7 +544,26 @@ ErrCode switchToCreateWorkoutPage(HWND window){
 	menu1->buttons[3].text = "-";
 	menu1->buttons[3].image = buttonImage;
 	menu1->buttons[3].textsize = size.y/2;
-	menu1->label_count = 1;
+
+	pos.x -= size.y;
+	pos.y += size.y;
+	menu1->buttons[4].pos = {pos.x, pos.y};
+	menu1->buttons[4].size = {size.y, size.y};
+	menu1->buttons[4].repos = {(int)(pos.x-size.y*0.05), (int)(pos.y-size.y*0.05)};
+	menu1->buttons[4].resize = {(int)(size.y+size.y*0.1), (int)(size.y+size.y*0.1)};
+	menu1->buttons[4].event = incIntensityTime;
+	menu1->buttons[4].text = "+";
+	menu1->buttons[4].image = buttonImage;
+	menu1->buttons[4].textsize = size.y/2;
+	pos.x += size.y;
+	menu1->buttons[5].pos = {pos.x, pos.y};
+	menu1->buttons[5].size = {size.y, size.y};
+	menu1->buttons[5].repos = {(int)(pos.x-size.y*0.05), (int)(pos.y-size.y*0.05)};
+	menu1->buttons[5].resize = {(int)(size.y+size.y*0.1), (int)(size.y+size.y*0.1)};
+	menu1->buttons[5].event = decIntensityTime;
+	menu1->buttons[5].text = "-";
+	menu1->buttons[5].image = buttonImage;
+	menu1->buttons[5].textsize = size.y/2;
 
 	main_page.menus[0] = menu1;
 	main_page.menu_count = 1;
@@ -542,8 +579,15 @@ void runWorkout(HWND window){
 #endif
 	if(!updateWorkout(*workout, rowingData.dist.upper - workout->distance)){
 		main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist.upper) + '.' + std::to_string(rowingData.dist.lower) + 'm';
-		main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + wordToString(rowingData.ms_total) + "m/s";
+		main_page.menus[0]->labels[1].text = "Zielgeschwindigkeit: " + wordToString(workout->intensity) + "m/s";
 		main_page.menus[0]->labels[2].text = "Durchschnittlich: " + wordToString(rowingData.ms_avg) + "m/s";
+		if(getWorkoutFlag(*workout, WORKOUT_INTENSITY)){
+			std::string intens;
+			if((workout->intensity-workout->intensity*0.02) > rowingData.ms_avg) intens = "+";
+			else if((workout->intensity+workout->intensity*0.02) < rowingData.ms_avg) intens = "-";
+			else intens = "";
+			main_page.menus[0]->labels[2].text = "Durchschnittlich: " + wordToString(rowingData.ms_avg) + "m/s " + intens;
+		}
 		WORD hrs = workout->duration/3600;
 		WORD min = (workout->duration/60)%60;
 		WORD sec = workout->duration%60;
@@ -605,7 +649,7 @@ ErrCode switchToWorkoutPage(HWND window){
 	menu1->button_count = 1;
 
 	WORD w = windowInfo.window_width/windowInfo.pixel_size;
-	WORD label_text_size = w*0.0775;
+	WORD label_text_size = w*0.068;
 	menu1->labels[0].pos = {20, 20};
 	menu1->labels[0].text_size = label_text_size;
 	menu1->labels[1].pos = {20, 20+label_text_size+(WORD)(label_text_size*0.16)};
