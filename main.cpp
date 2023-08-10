@@ -10,6 +10,7 @@ extern "C"{
 #include "page.h"
 #include "graphs.h"
 #include "workout.h"
+#include "simulation2D.h"
 
 //#define NO_DEVICE
 
@@ -25,6 +26,7 @@ BYTE page_select = 0;	//0 Startseite, 1 free training Seite
 Font* default_font = nullptr;
 //Workouts
 Workout* workout = nullptr;
+VirtualRowing2D* simulation2D = nullptr;
 
 LRESULT CALLBACK main_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 ErrCode loadStartPage(){setPageFlag(main_page, PAGE_LOAD); page_select = 0; return SUCCESS;}
@@ -108,6 +110,10 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	initCommunication(hDevice, sendBuffer, receiveBuffer);
 #endif
 
+	//TODO remove
+	const char* boat_images[] = {"textures/boat.tex", "textures/boat.tex", "textures/boat.tex", "textures/boat.tex"};
+	createVirtualRowing2D(simulation2D, boat_images, 4);
+
 	default_font = new Font;
 	ErrCheck(loadFont("fonts/ascii.tex", *default_font, {82, 83}), "font laden");
 	default_font->font_size = 31;
@@ -129,11 +135,15 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 #endif
 	}
 
+	//TODO remove
+	destroyVirtualRowing2D(simulation2D);
+
 	//Threads abfangen
 	render_thread.join();
 	//Aufräumen
 	destroyPageNoFont(main_page);
 	destroyFont(default_font);
+	destroyWorkout(workout);
 #ifndef NO_DEVICE
 	strcpy((char*)sendBuffer, "EXIT");
 	sendPacket(hDevice, sendBuffer, sizeof("EXIT")-1);
@@ -475,7 +485,6 @@ ErrCode switchToCreateWorkoutPage(HWND window){
 	destroyPageNoFont(main_page);
 	destroyWorkout(workout);
 	createWorkout(workout);
-	workout->duration = 60;
 
 	WORD idx = 0;
 	ErrCheck(getWindow(window, idx));
@@ -592,6 +601,10 @@ void runWorkout(HWND window){
 		WORD min = (workout->duration/60)%60;
 		WORD sec = workout->duration%60;
 		main_page.menus[0]->labels[3].text = "Zeit: " + std::to_string(hrs) + ':' + std::to_string(min) + ':' + std::to_string(sec);
+
+		//TODO remove
+		updateVirtualRowing2D(*simulation2D, window, *default_font, rowingData.ms_avg);
+
 	}else{
 		if(getWorkoutFlag(*workout, WORKOUT_DONE)){
 			Statistic s1;
@@ -612,6 +625,9 @@ void runWorkout(HWND window){
 ErrCode switchToWorkoutPage(HWND window){
 	destroyPageNoFont(main_page);
 	workout->distance = 0;
+
+	//TODO remove
+	initVirtualRowing2D(*simulation2D, workout->intensity);
 
 #ifndef NO_DEVICE
 	strcpy((char*)sendBuffer, "RESET");

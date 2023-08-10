@@ -30,8 +30,8 @@ enum ErrCode{
 };
 enum ErrCodeFlags{
 	ERR_NO_FLAG = 0,
-	ERR_NO_OUTPUT,
-	ERR_ON_FATAL
+	ERR_NO_OUTPUT = 1,
+	ERR_ON_FATAL = 2
 };
 //TODO ERR_ON_FATAL ausgeben können wenn der nutzer es so möchte
 inline ErrCode ErrCheck(ErrCode code, const char* msg="\0", ErrCodeFlags flags=ERR_NO_FLAG){
@@ -95,8 +95,8 @@ inline constexpr void resetButton(Mouse& mouse, MOUSEBUTTON button){mouse.button
 
 inline std::string floatToString(float value, BYTE decimals=2){
 	WORD precision = pow(10, decimals);
-	DWORD val = value * precision;
-	return std::to_string(val/precision) + '.' + std::to_string(val%precision);
+	long val = value * precision;
+	return std::to_string(val/precision) + '.' + std::to_string(abs(val%precision));
 }
 
 inline std::string wordToString(WORD value, BYTE decimals=2){

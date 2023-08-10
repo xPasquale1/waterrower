@@ -256,7 +256,7 @@ void transmitRequests(RequestQueue& queue, HANDLE hDevice){
 	currentmilli += last_request_tp.wMinute*60000;
 	currentmilli += last_request_tp.wHour*3600000;
 	if(newmilli - currentmilli >= 25){
-		last_request_tp = systemTime;
+		last_request_tp = systemTime; //TODO Kopiert das ganze struct, unnötig
 		sendPacket(hDevice, queue.requests[queue.request_ptr2].data, queue.requests[queue.request_ptr2].length);
 		queue.request_ptr2 = (queue.request_ptr2+1)%(REQUEST_QUEUE_SIZE);
 	}

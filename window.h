@@ -400,6 +400,39 @@ ErrCode copyImageToWindow(HWND window, Image& image, int start_x, int start_y, i
 	return WINDOW_NOT_FOUND;
 }
 
+//idx ist der window index
+inline void copyImageToWindow(WORD window_idx, Image& image, int start_x, int start_y, int end_x, int end_y){
+	uint buffer_width = app.info[window_idx].window_width/app.info[window_idx].pixel_size;
+	uint* pixels = app.pixels[window_idx];
+	for(int y=start_y; y < end_y; ++y){
+		float scaled_y = (float)(y-start_y)/(end_y-start_y);
+		for(int x=start_x; x < end_x; ++x){
+			uint ry = scaled_y*image.height;
+			uint rx = (float)(x-start_x)/(end_x-start_x)*(image.width-1);
+			uint color = image.data[ry*image.width+rx];
+			if(A(color) > 0) pixels[y*buffer_width+x] = color;
+		}
+	}
+}
+
+//Funktion testet ob jeder pixel im gültigen Fensterbereich liegt! idx ist der window index
+inline void copyImageToWindowSave(WORD window_idx, Image& image, int start_x, int start_y, int end_x, int end_y){
+	uint buffer_width = app.info[window_idx].window_width/app.info[window_idx].pixel_size;
+	uint buffer_height = app.info[window_idx].window_height/app.info[window_idx].pixel_size;
+	uint* pixels = app.pixels[window_idx];
+	for(int y=start_y; y < end_y; ++y){
+		if(y < 0 || y >= (int)buffer_height) continue;
+		float scaled_y = (float)(y-start_y)/(end_y-start_y);
+		for(int x=start_x; x < end_x; ++x){
+			if(x < 0 || x >= (int)buffer_width) continue;
+			uint ry = scaled_y*image.height;
+			uint rx = (float)(x-start_x)/(end_x-start_x)*(image.width-1);
+			uint color = image.data[ry*image.width+rx];
+			if(A(color) > 0) pixels[y*buffer_width+x] = color;
+		}
+	}
+}
+
 struct Font{
 	Image image;
 	ivec2 char_size;		//Größe eines Symbols im Image

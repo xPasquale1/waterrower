@@ -10,9 +10,9 @@ enum WORKOUTFLAGS{
 struct Workout{
 	BYTE id = 0;			//0 -> Zeitworkout
 	SYSTEMTIME last_time;	//Start-Zeitpunkt
-	long duration = 0;		//in Sekunden
+	long duration = 600;	//in Sekunden
 	WORD distance = 0;		//Ruderweite
-	WORD intensity = 0;		//Gewünschte Intensität
+	WORD intensity = 350;	//Gewünschte Intensität
 	BYTE flags = 0;			//Flags
 };
 
@@ -21,6 +21,7 @@ inline constexpr void setWorkoutFlag(Workout& workout, WORKOUTFLAGS flag){workou
 inline constexpr void resetWorkoutFlag(Workout& workout, WORKOUTFLAGS flag){workout.flags &= ~flag;}
 
 void createWorkout(Workout*& workout){
+	if(workout) return;
 	workout = new Workout;
 }
 
