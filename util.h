@@ -93,15 +93,20 @@ inline constexpr bool getButton(Mouse& mouse, MOUSEBUTTON button){return (mouse.
 inline constexpr void setButton(Mouse& mouse, MOUSEBUTTON button){mouse.button |= button;}
 inline constexpr void resetButton(Mouse& mouse, MOUSEBUTTON button){mouse.button &= ~button;}
 
+//TODO die beiden könnten besser sein...
 inline std::string floatToString(float value, BYTE decimals=2){
 	WORD precision = pow(10, decimals);
 	long val = value * precision;
-	return std::to_string(val/precision) + '.' + std::to_string(abs(val%precision));
+	std::string decimal = std::to_string(abs(val%precision));
+	if(decimal.size() < 2) decimal.insert(0, 1, '0');
+	return std::to_string(val/precision) + '.' + decimal;
 }
 
 inline std::string wordToString(WORD value, BYTE decimals=2){
 	WORD precision = pow(10, decimals);
-	return std::to_string(value/precision) + '.' + std::to_string(value%precision);
+	std::string decimal = std::to_string(value%precision);
+	if(decimal.size() < 2) decimal.insert(0, 1, '0');
+	return std::to_string(value/precision) + '.' + decimal;
 }
 
 enum KEYBOARDBUTTON : unsigned long long{
