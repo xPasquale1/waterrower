@@ -50,6 +50,7 @@ void initVirtualRowing2D(VirtualRowing2D& sim, WORD intensity){
 		sim.speeds[i] = sim.intensity*random;
 	}
 	GetSystemTime(&sim.last_time);
+	srand(sim.last_time.wMilliseconds);
 }
 
 //TODO Boote starten direkt mit der intensity, sollten am Start aber langsam beschleunigen, Messdaten notwendig
