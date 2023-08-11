@@ -93,20 +93,40 @@ inline constexpr bool getButton(Mouse& mouse, MOUSEBUTTON button){return (mouse.
 inline constexpr void setButton(Mouse& mouse, MOUSEBUTTON button){mouse.button |= button;}
 inline constexpr void resetButton(Mouse& mouse, MOUSEBUTTON button){mouse.button &= ~button;}
 
-//TODO die beiden könnten besser sein...
+//std::to_string ist langsam, das ist simpel und schnell
+inline const char* longToString(long value){
+	static char _dec_to_str_out[12];
+	_dec_to_str_out[11] = '\0';
+	long idx = 10;
+	if(value < 0){
+		value = 0-value;
+		do{
+			_dec_to_str_out[idx--] = '0'+value%10;
+			value /= 10;
+		}while(value != 0);
+		_dec_to_str_out[idx--] = '-';
+		return _dec_to_str_out+idx+1;
+	}else{
+		do{
+			_dec_to_str_out[idx--] = '0'+value%10;
+			value /= 10;
+		}while(value != 0);
+		return _dec_to_str_out+idx+1;
+	}
+	return _dec_to_str_out+idx+1;
+}
+
+//value hat decimals Nachkommestellen
+inline std::string intToString(int value, BYTE decimals=2){
+	std::string out = longToString(value);
+	if(out.size() > decimals && decimals) out.insert(out.size()-decimals, 1, '.');
+	return out;
+}
+
 inline std::string floatToString(float value, BYTE decimals=2){
 	WORD precision = pow(10, decimals);
 	long val = value * precision;
-	std::string decimal = std::to_string(abs(val%precision));
-	if(decimal.size() < 2) decimal.insert(0, 1, '0');
-	return std::to_string(val/precision) + '.' + decimal;
-}
-
-inline std::string wordToString(WORD value, BYTE decimals=2){
-	WORD precision = pow(10, decimals);
-	std::string decimal = std::to_string(value%precision);
-	if(decimal.size() < 2) decimal.insert(0, 1, '0');
-	return std::to_string(value/precision) + '.' + decimal;
+	return intToString(val, decimals);
 }
 
 enum KEYBOARDBUTTON : unsigned long long{

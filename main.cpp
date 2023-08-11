@@ -315,8 +315,8 @@ void displayDataPage(HWND window){
 		refreshData(queue);
 #endif
 	main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist.upper) + '.' + std::to_string(rowingData.dist.lower) + 'm';
-	main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + wordToString(rowingData.ms_total) + "m/s";
-	main_page.menus[0]->labels[2].text = "Durchschnittlich: " + wordToString(rowingData.ms_avg) + "m/s";
+	main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + intToString(rowingData.ms_total) + "m/s";
+	main_page.menus[0]->labels[2].text = "Durchschnittlich: " + intToString(rowingData.ms_avg) + "m/s";
 	main_page.menus[0]->labels[3].text = "Zeit: " + std::to_string(rowingData.time.hrs) + ':' + std::to_string(rowingData.time.min) + ':' + std::to_string(rowingData.time.sec);
 }
 ErrCode endFreeTraining(){
@@ -408,7 +408,7 @@ void displayStatistics(HWND window){
 	WORD height = app.info[idx].window_height/app.info[idx].pixel_size;
 	ErrCheck(drawGraph(window, *default_font, width/2-width*0.625/2, height*0.0625, width*0.625, height*0.625, dps, 10));
 	main_page.menus[0]->labels[0].pos = {(int)(width/2-width*0.625/2), (int)(height*0.0625+height*0.625+20)};
-	main_page.menus[0]->labels[0].text = "Wasservolumen: " + wordToString(rowingData.volume) + 'L';
+	main_page.menus[0]->labels[0].text = "Wasservolumen: " + intToString(rowingData.volume) + 'L';
 }
 ErrCode switchToStatistikPage(HWND window){
 	destroyPageNoFont(main_page);
@@ -472,13 +472,13 @@ ErrCode decWorkoutTime(){
 ErrCode incIntensityTime(){
 	workout->intensity += 10;
 	setWorkoutFlag(*workout, WORKOUT_INTENSITY);
-	main_page.menus[0]->labels[1].text = "Zielgeschw.: " + wordToString(workout->intensity) + "m/s";
+	main_page.menus[0]->labels[1].text = "Zielgeschw.: " + intToString(workout->intensity) + "m/s";
 	return SUCCESS;
 }
 ErrCode decIntensityTime(){
 	if(workout->intensity >= 10) workout->intensity -= 10;
 	if(workout->intensity == 0) resetWorkoutFlag(*workout, WORKOUT_INTENSITY);
-	main_page.menus[0]->labels[1].text = "Zielgeschw.: " + wordToString(workout->intensity) + "m/s";
+	main_page.menus[0]->labels[1].text = "Zielgeschw.: " + intToString(workout->intensity) + "m/s";
 	return SUCCESS;
 }
 ErrCode switchToCreateWorkoutPage(HWND window){
@@ -532,7 +532,7 @@ ErrCode switchToCreateWorkoutPage(HWND window){
 	menu1->labels[0].text = "Dauer: " + std::to_string(workout->duration/60) + "min";
 	menu1->labels[0].text_size = label_text_size;
 	menu1->labels[1].pos = {pos.x, pos.y+size.y+(int)(windowInfo.window_height/windowInfo.pixel_size*0.0125)};
-	menu1->labels[1].text = "Zielgeschw.: " + wordToString(workout->intensity) + "m/s";
+	menu1->labels[1].text = "Zielgeschw.: " + intToString(workout->intensity) + "m/s";
 	menu1->labels[1].text_size = label_text_size;
 	menu1->label_count = 2;
 	pos.x += (int)(windowInfo.window_width/windowInfo.pixel_size*0.375);
@@ -588,14 +588,14 @@ void runWorkout(HWND window){
 #endif
 	if(!updateWorkout(*workout, rowingData.dist.upper - workout->distance)){
 		main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist.upper) + '.' + std::to_string(rowingData.dist.lower) + 'm';
-		main_page.menus[0]->labels[1].text = "Zielgeschwindigkeit: " + wordToString(workout->intensity) + "m/s";
-		main_page.menus[0]->labels[2].text = "Durchschnittlich: " + wordToString(rowingData.ms_avg) + "m/s";
+		main_page.menus[0]->labels[1].text = "Zielgeschwindigkeit: " + intToString(workout->intensity) + "m/s";
+		main_page.menus[0]->labels[2].text = "Durchschnittlich: " + intToString(rowingData.ms_avg) + "m/s";
 		if(getWorkoutFlag(*workout, WORKOUT_INTENSITY)){
 			std::string intens;
 			if((workout->intensity-workout->intensity*0.02) > rowingData.ms_avg) intens = "+";
 			else if((workout->intensity+workout->intensity*0.02) < rowingData.ms_avg) intens = "-";
 			else intens = "";
-			main_page.menus[0]->labels[2].text = "Durchschnittlich: " + wordToString(rowingData.ms_avg) + "m/s " + intens;
+			main_page.menus[0]->labels[2].text = "Durchschnittlich: " + intToString(rowingData.ms_avg) + "m/s " + intens;
 		}
 		WORD hrs = workout->duration/3600;
 		WORD min = (workout->duration/60)%60;
