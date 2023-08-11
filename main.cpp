@@ -588,14 +588,14 @@ void runWorkout(HWND window){
 #endif
 	if(!updateWorkout(*workout, rowingData.dist.upper - workout->distance)){
 		main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist.upper) + '.' + std::to_string(rowingData.dist.lower) + 'm';
-		main_page.menus[0]->labels[1].text = "Zielgeschwindigkeit: " + intToString(workout->intensity) + "m/s";
-		main_page.menus[0]->labels[2].text = "Durchschnittlich: " + intToString(rowingData.ms_avg) + "m/s";
+		main_page.menus[0]->labels[2].text = "Zielgeschwindigkeit: " + intToString(workout->intensity) + "m/s";
+		main_page.menus[0]->labels[1].text = "Durchschnittlich: " + intToString(rowingData.ms_avg) + "m/s";
 		if(getWorkoutFlag(*workout, WORKOUT_INTENSITY)){
 			std::string intens;
 			if((workout->intensity-workout->intensity*0.02) > rowingData.ms_avg) intens = "+";
 			else if((workout->intensity+workout->intensity*0.02) < rowingData.ms_avg) intens = "-";
 			else intens = "";
-			main_page.menus[0]->labels[2].text = "Durchschnittlich: " + intToString(rowingData.ms_avg) + "m/s " + intens;
+			main_page.menus[0]->labels[1].text = "Durchschnittlich: " + intToString(rowingData.ms_avg) + "m/s " + intens;
 		}
 		WORD hrs = workout->duration/3600;
 		WORD min = (workout->duration/60)%60;
@@ -627,6 +627,7 @@ ErrCode switchToWorkoutPage(HWND window){
 	workout->distance = 0;
 
 	//TODO remove
+	setWorkoutFlag(*workout, WORKOUT_INTENSITY);
 	initVirtualRowing2D(*simulation2D, workout->intensity);
 
 #ifndef NO_DEVICE

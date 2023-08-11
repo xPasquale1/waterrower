@@ -15,8 +15,10 @@ struct VirtualRowing2D{
 	BYTE boat_count = 0;					//Anzahl der Boote
 	Image boat_images[BOATCOUNT_MAX];		//Bilder der Boote
 	float distances[BOATCOUNT_MAX] = {};	//Distanz der einzelnen Boote
+	WORD speeds[BOATCOUNT_MAX];				//Geschwindigkeit der einzelnen Boote
 	WORD intensity = 360;					//Gewünschte Intensität die die Boote fahren sollen (in m/s)
 	SYSTEMTIME last_time;					//Letzter Zeitpunkt an dem die Simulation geupdated wurde
+	WORD millis = 0;						//Zählt die Millisekunden
 };
 
 //Die Anzahl der Image Pfade muss gleich dem boat_count sein!
@@ -43,6 +45,10 @@ void initVirtualRowing2D(VirtualRowing2D& sim, WORD intensity){
 		sim.distances[i] = 0;
 	}
 	sim.intensity = intensity;
+	for(BYTE i=0; i < sim.boat_count; ++i){
+		float random = 1+((rand()%16001)/100000.f-0.08);
+		sim.speeds[i] = sim.intensity*random;
+	}
 	GetSystemTime(&sim.last_time);
 }
 
@@ -55,14 +61,21 @@ void updateVirtualRowing2D(VirtualRowing2D& sim, HWND window, Font& font, WORD a
 	millis += (tp.wSecond-sim.last_time.wSecond)*1000;
 	millis += (tp.wMinute-sim.last_time.wMinute)*60000;
 	millis += (tp.wHour-sim.last_time.wHour)*3600000;
+	sim.millis += millis;
 	float dt = millis/1000.f;
 	sim.last_time = tp;	//TODO Kopiert das ganze struct, unnötig
 	//Update die Positionen der anderen Boote
 	for(BYTE i=1; i < sim.boat_count; ++i){
-		float random = 1+((rand()%8001)/100000.f-0.04)+i*(rand()%4001)/100000.f;	//TODO Abweichung angeben können
-		sim.distances[i] += sim.intensity*0.01*random*dt;
+		sim.distances[i] += sim.speeds[i]*0.01*dt;
 	}
 	sim.distances[0] += avg_ms*0.01*dt;	//Update die Position des eigenen Bootes
+	//Update die Geschwindigkeiten
+	if(sim.millis >= 20000){	//Alle 20 Sekunden
+		for(BYTE i=0; i < sim.boat_count; ++i){
+			float random = 1+((rand()%16001)/100000.f-0.08);
+			sim.speeds[i] = sim.intensity*random;
+		}
+	}
 	//Zeichne die Boote
 	WORD window_idx;
 	getWindow(window, window_idx);
