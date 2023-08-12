@@ -93,27 +93,35 @@ inline constexpr bool getButton(Mouse& mouse, MOUSEBUTTON button){return (mouse.
 inline constexpr void setButton(Mouse& mouse, MOUSEBUTTON button){mouse.button |= button;}
 inline constexpr void resetButton(Mouse& mouse, MOUSEBUTTON button){mouse.button &= ~button;}
 
+inline constexpr __attribute__((always_inline)) const char* stringLookUp2(long value){
+	return &"001020304050607080900111213141516171819102122232425262728292"
+			"031323334353637383930414243444546474849405152535455565758595"
+			"061626364656667686960717273747576777879708182838485868788898"
+			"09192939495969798999"[value*2];
+}
 //std::to_string ist langsam, das ist simpel und schnell
+static char _dec_to_str_out[12] = "00000000000";
 inline const char* longToString(long value){
-	static char _dec_to_str_out[12];
-	_dec_to_str_out[11] = '\0';
-	long idx = 10;
-	if(value < 0){
+	char* ptr = _dec_to_str_out + 11;
+	*ptr = '0';
+	char c = 0;
+	if(value <= 0){
+		value < 0 ? c = '-' : c = '0';
 		value = 0-value;
-		do{
-			_dec_to_str_out[idx--] = '0'+value%10;
-			value /= 10;
-		}while(value != 0);
-		_dec_to_str_out[idx--] = '-';
-		return _dec_to_str_out+idx+1;
-	}else{
-		do{
-			_dec_to_str_out[idx--] = '0'+value%10;
-			value /= 10;
-		}while(value != 0);
-		return _dec_to_str_out+idx+1;
 	}
-	return _dec_to_str_out+idx+1;
+	while(value >= 100){
+		const char* tmp = stringLookUp2(value%100);
+		ptr[0] = tmp[0];
+		ptr[-1] = tmp[1];
+		ptr -= 2;
+		value /= 100;
+	}
+	while(value){
+		*ptr-- = '0'+value%10;
+		value /= 10;
+	}
+	if(c) *ptr-- = c;
+	return ptr+1;
 }
 
 //value hat decimals Nachkommestellen
