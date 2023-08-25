@@ -96,7 +96,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	//TODO testet nur Port 1-10 für Geräte und auch nicht ob es ein waterrower ist
 	for(WORD i=1; i <= 10; ++i){
 		std::string port = "\\\\.\\COM" + std::to_string(i);
-		if(openDevice(hDevice, port.c_str(), 19200) == SUCCESS){
+		if(ErrCheck(openDevice(hDevice, port.c_str(), 19200)) == SUCCESS){
 			break;
 		};
 	}
@@ -481,6 +481,12 @@ ErrCode decIntensityTime(){
 	main_page.menus[0]->labels[1].text = "Zielgeschw.: " + intToString(workout->intensity) + "m/s";
 	return SUCCESS;
 }
+ErrCode toggleSimulation(){
+	workout->flags ^= WORKOUT_SIMULATION;
+	if(getWorkoutFlag(*workout, WORKOUT_SIMULATION)) main_page.menus[0]->buttons[6].text = "Simulation";
+	else main_page.menus[0]->buttons[6].text = "Keine Simulation";
+	return SUCCESS;
+}
 ErrCode switchToCreateWorkoutPage(HWND window){
 	destroyPageNoFont(main_page);
 	destroyWorkout(workout);
@@ -523,7 +529,7 @@ ErrCode switchToCreateWorkoutPage(HWND window){
 	menu1->buttons[1].text = "Starte Workout";
 	menu1->buttons[1].image = buttonImage;
 	menu1->buttons[1].textsize = size.y/2;
-	menu1->button_count = 6;
+	menu1->button_count = 7;
 
 	WORD w = windowInfo.window_width/windowInfo.pixel_size;
 	WORD label_text_size = w*0.038;
@@ -574,6 +580,18 @@ ErrCode switchToCreateWorkoutPage(HWND window){
 	menu1->buttons[5].image = buttonImage;
 	menu1->buttons[5].textsize = size.y/2;
 
+	//Optionsbuttons
+	pos.x = (int)(windowInfo.window_width/windowInfo.pixel_size*0.125);
+	pos.y += size.y+(int)(windowInfo.window_height/windowInfo.pixel_size*0.0125);
+	menu1->buttons[6].pos = {pos.x, pos.y};
+	menu1->buttons[6].size = {size.x, size.y};
+	menu1->buttons[6].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
+	menu1->buttons[6].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
+	menu1->buttons[6].event = toggleSimulation;
+	menu1->buttons[6].text = "Keine Simulation";
+	menu1->buttons[6].image = buttonImage;
+	menu1->buttons[6].textsize = size.y/2;
+
 	main_page.menus[0] = menu1;
 	main_page.menu_count = 1;
 
@@ -602,8 +620,7 @@ void runWorkout(HWND window){
 		WORD sec = workout->duration%60;
 		main_page.menus[0]->labels[3].text = "Zeit: " + std::to_string(hrs) + ':' + std::to_string(min) + ':' + std::to_string(sec);
 
-		//TODO remove
-		updateVirtualRowing2D(*simulation2D, window, *default_font, rowingData.ms_avg);
+		if(getWorkoutFlag(*workout, WORKOUT_SIMULATION)) updateVirtualRowing2D(*simulation2D, window, *default_font, rowingData.ms_avg);
 
 	}else{
 		if(getWorkoutFlag(*workout, WORKOUT_DONE)){
@@ -626,9 +643,9 @@ ErrCode switchToWorkoutPage(HWND window){
 	destroyPageNoFont(main_page);
 	workout->distance = 0;
 
-	//TODO remove
+	//TODO Sollte eine Option sein
 	setWorkoutFlag(*workout, WORKOUT_INTENSITY);
-	initVirtualRowing2D(*simulation2D, workout->intensity);
+	if(getWorkoutFlag(*workout, WORKOUT_SIMULATION)) initVirtualRowing2D(*simulation2D, workout->intensity);
 
 #ifndef NO_DEVICE
 	strcpy((char*)sendBuffer, "RESET");
