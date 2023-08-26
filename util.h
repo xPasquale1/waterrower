@@ -127,7 +127,9 @@ inline const char* longToString(long value){
 //value hat decimals Nachkommestellen
 inline std::string intToString(int value, BYTE decimals=2){
 	std::string out = longToString(value);
-	if(out.size() > decimals && decimals) out.insert(out.size()-decimals, 1, '.');
+	if(out.size() < 3 && out[0] != '-') out.insert(0, 3-out.size(), '0');
+	else if(out.size() < 4 && out[0] == '-') out.insert(1, 3-(out.size()-1), '0');
+	out.insert(out.size()-decimals, 1, '.');
 	return out;
 }
 
