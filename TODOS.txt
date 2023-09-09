@@ -1,6 +1,4 @@
 Mehr nützliche Daten auslesen können
-Beim öffnen des Geräts kann einiges schief gehen, die gängigsten Fehler von GetLastError sollten in ErrCodes aufgenommen werden
-^ Sollte die Applikation erst starten und dann verbinden auf Wunsch, voher können keine Workouts,... gestartet werden
-Workouts erstellen die einem sagen ob schneller oder langsamer
+Sollte die Applikation erst starten und dann verbinden auf Wunsch, voher können keine Workouts,... gestartet werden
 Die Distanz könnte ja auf 3Byte erweitert werden, da 65km max. doch relativ klein ist
 Video abspielen oder virtuelle Welt erzeugen

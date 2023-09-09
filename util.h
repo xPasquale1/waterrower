@@ -14,7 +14,10 @@ struct ivec2{
 //Error-Codes
 enum ErrCode{
 	SUCCESS = 0,
+	GENERIC_ERROR,
+	APP_INIT,
 	BAD_ALLOC,
+	CREATE_WINDOW,
 	TEXTURE_NOT_FOUND,
 	MODEL_NOT_FOUND,
 	FILE_NOT_FOUND,
@@ -26,7 +29,8 @@ enum ErrCode{
 	INVALID_USB_HANDLE,
 	COMMSTATE_ERROR,
 	TIMEOUT_SET_ERROR,
-	CODE_NOT_FOUND
+	CODE_NOT_FOUND,
+	INIT_RENDER_TARGET
 };
 enum ErrCodeFlags{
 	ERR_NO_FLAG = 0,
@@ -39,6 +43,12 @@ inline ErrCode ErrCheck(ErrCode code, const char* msg="\0", ErrCodeFlags flags=E
 	case BAD_ALLOC:
 		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[BAD_ALLOC ERROR] " << msg << std::endl;
 		return BAD_ALLOC;
+	case GENERIC_ERROR:
+		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[GENERIC_ERROR ERROR] " << msg << std::endl;
+		return GENERIC_ERROR;
+	case CREATE_WINDOW:
+		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[CREATE_WINDOW ERROR] " << msg << std::endl;
+		return CREATE_WINDOW;
 	case TEXTURE_NOT_FOUND:
 		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[TEXTURE_NOT_FOUND ERROR] " << msg << std::endl;
 		return TEXTURE_NOT_FOUND;
@@ -75,6 +85,12 @@ inline ErrCode ErrCheck(ErrCode code, const char* msg="\0", ErrCodeFlags flags=E
 	case CODE_NOT_FOUND:
 		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[CODE_NOT_FOUND ERROR] " << msg << std::endl;
 		return CODE_NOT_FOUND;
+	case APP_INIT:
+		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[APP_INIT ERROR] " << msg << std::endl;
+		return APP_INIT;
+	case INIT_RENDER_TARGET:
+		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[INIT_RENDER_TARGET ERROR] " << msg << std::endl;
+		return INIT_RENDER_TARGET;
 	default: return SUCCESS;
 	}
 	return SUCCESS;
@@ -127,9 +143,9 @@ inline const char* longToString(long value){
 //value hat decimals Nachkommestellen
 inline std::string intToString(int value, BYTE decimals=2){
 	std::string out = longToString(value);
-	if(out.size() < 3 && out[0] != '-') out.insert(0, 3-out.size(), '0');
-	else if(out.size() < 4 && out[0] == '-') out.insert(1, 3-(out.size()-1), '0');
-	out.insert(out.size()-decimals, 1, '.');
+	if(out.size() < ((size_t)decimals+1) && out[0] != '-') out.insert(0, (decimals+1)-out.size(), '0');
+	else if(out.size() < ((size_t)decimals+2) && out[0] == '-') out.insert(1, (decimals+1)-(out.size()-1), '0');
+	if(decimals) out.insert(out.size()-decimals, 1, '.');
 	return out;
 }
 

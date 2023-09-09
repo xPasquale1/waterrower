@@ -17,6 +17,7 @@ extern "C"{
 #define FPS 60
 #define FPSMILLIS 1000/FPS
 
+HINSTANCE ghInstance;
 HANDLE hDevice = nullptr;
 BYTE receiveBuffer[128];
 BYTE sendBuffer[128];
@@ -70,18 +71,18 @@ void refreshData(RequestQueue& queue, WORD interval=250){
 	}
 }
 
-void renderFunc(HINSTANCE hInstance){
+void renderFunc(){
 	HWND main_window;
-	if(ErrCheck(openWindow(hInstance, 800, 800, 1, main_window, "waterrower", main_window_callback), "open main window") != SUCCESS){
+	if(ErrCheck(openWindow(ghInstance, 800, 800, 100, 50, 1, main_window, "waterrower", main_window_callback), "open main window") != SUCCESS){
 		resetAppFlag(APP_RUNNING);
 		return;
 	};
 	while(getAppFlag(APP_RUNNING)){
 		SYSTEMTIME t1;
 		GetSystemTime(&t1);
-		ErrCheck(clearWindow(main_window), "clear window");
+		clearWindows();
 		updatePage(main_page, main_window);
-		ErrCheck(drawWindow(main_window), "draw window");
+		drawWindows();
 		handleSignals(main_window);
 		SYSTEMTIME t2;
 		GetSystemTime(&t2);
@@ -92,6 +93,9 @@ void renderFunc(HINSTANCE hInstance){
 }
 
 INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){
+	ghInstance = hInstance;
+	if(ErrCheck(initApp()) != SUCCESS) return -1;
+
 #ifndef NO_DEVICE
 	//TODO testet nur Port 1-10 für Geräte und auch nicht ob es ein waterrower ist
 	for(WORD i=1; i <= 10; ++i){
@@ -122,7 +126,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	ErrCheck(loadStartPage(), "laden des Startbildschirms");
 	setAppFlag(APP_RUNNING);
 
-	std::thread render_thread(renderFunc, hInstance);
+	std::thread render_thread(renderFunc);
 
 	while(getAppFlag(APP_RUNNING)){
 #ifndef NO_DEVICE
@@ -149,19 +153,20 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	sendPacket(hDevice, sendBuffer, sizeof("EXIT")-1);
 	CloseHandle(hDevice);
 #endif
+	closeApp();
 	return 0;
 }
 
 LRESULT CALLBACK main_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 	switch(uMsg){
 	case WM_DESTROY:{
-		ErrCheck(setWindowState(hwnd, WINDOW_CLOSE), "setze close Fensterstatus");
+		ErrCheck(setWindowFlag(hwnd, WINDOW_CLOSE), "setze close Fensterstatus");
 		break;
 	}
 	case WM_SIZE:{
 		UINT width = LOWORD(lParam);
 		UINT height = HIWORD(lParam);
-		ErrCheck(setWindowState(hwnd, WINDOW_RESIZE), "setzte resize Fensterstatus");
+		ErrCheck(setWindowFlag(hwnd, WINDOW_RESIZE), "setzte resize Fensterstatus");
 		ErrCheck(resizeWindow(hwnd, width, height, 1), "Fenster skalieren");
         break;
 	}
@@ -208,20 +213,25 @@ LRESULT CALLBACK main_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARA
 
 ErrCode handleSignals(HWND window){
 	getMessages();
-	for(WORD i=0; i < app.window_count; ++i){
+	for(int i=0; i < app.window_count; ++i){
 		HWND windowIter = app.windows[i];
 		WINDOWFLAGS state;
 		while((state = getNextWindowState(windowIter))){
 			switch(state){
 			case WINDOW_CLOSE:
-				closeWindow(windowIter);
+				ErrCheck(closeWindow(windowIter));
 				if(app.window_count == 0) resetAppFlag(APP_RUNNING);
+				--i;
+				goto whileend;	//TODO Nix gut
 				break;
 			case WINDOW_RESIZE:
 				setPageFlag(main_page, PAGE_LOAD);
 				break;
+			default:
+				break;
 			}
 		}
+		whileend:;		//TODO Nix gut
 	}
 	PAGEFLAGSTYPE flag;
 	while((flag = getNextPageFlag(main_page))){
@@ -252,6 +262,10 @@ ErrCode handleSignals(HWND window){
 ErrCode switchToStartPage(HWND window){
 	destroyPageNoFont(main_page);
 	destroyWorkout(workout);
+
+	for(WORD i=1; i < app.window_count; ++i){
+		ErrCheck(setWindowFlag(app.windows[i], WINDOW_CLOSE));
+	}
 
 	//TODO meh...
 	initRowingData(rowingData);
@@ -314,10 +328,29 @@ void displayDataPage(HWND window){
 #ifndef NO_DEVICE
 		refreshData(queue);
 #endif
-	main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist.upper) + '.' + std::to_string(rowingData.dist.lower) + 'm';
+	main_page.menus[0]->labels[0].text = "Distanz: " + intToString(rowingData.dist.upper, 0) + '.' + intToString(rowingData.dist.lower, 0) + 'm';
 	main_page.menus[0]->labels[1].text = "Geschwindigkeit: " + intToString(rowingData.ms_total) + "m/s";
 	main_page.menus[0]->labels[2].text = "Durchschnittlich: " + intToString(rowingData.ms_avg) + "m/s";
-	main_page.menus[0]->labels[3].text = "Zeit: " + std::to_string(rowingData.time.hrs) + ':' + std::to_string(rowingData.time.min) + ':' + std::to_string(rowingData.time.sec);
+	main_page.menus[0]->labels[3].text = "Zeit: " + intToString(rowingData.time.hrs, 0) + ':' + intToString(rowingData.time.min, 0) + ':' + intToString(rowingData.time.sec, 0);
+	if(app.window_count > 1){
+		WORD offset = 0;
+		WORD window_idx;
+		WORD fontSize = default_font->font_size;
+		default_font->font_size = 48;
+		if(ErrCheck(getWindow(*(HWND*)main_page.data, window_idx)) != SUCCESS) return;
+		for(size_t i=0; i < main_page.menus[0]->labels[0].text.size(); ++i){
+			offset += drawFontChar(window_idx, *default_font, main_page.menus[0]->labels[0].text[i], 10+offset, 10);
+		}
+		offset = 0;
+		for(size_t i=0; i < main_page.menus[0]->labels[2].text.size(); ++i){
+			offset += drawFontChar(window_idx, *default_font, main_page.menus[0]->labels[2].text[i], 10+offset, default_font->font_size+20);
+		}
+		offset = 0;
+		for(size_t i=0; i < main_page.menus[0]->labels[3].text.size(); ++i){
+			offset += drawFontChar(window_idx, *default_font, main_page.menus[0]->labels[3].text[i], 10+offset, default_font->font_size*2+30);
+		}
+		default_font->font_size = fontSize;
+	}
 }
 ErrCode endFreeTraining(){
 	if(rowingData.dist.upper){
@@ -343,6 +376,20 @@ ErrCode switchToFreeTrainingPage(HWND window){
 	strcpy((char*)sendBuffer, "RESET");
 	sendPacket(hDevice, sendBuffer, sizeof("RESET")-1);
 #endif
+
+	//TODO öffne ein Overlayfenster (nach Wunsch) auf welchem die Ruderdaten angezeigt werden
+	if(app.window_count <= 1){
+		HWND overlay_window;
+		if(ErrCheck(openWindow(ghInstance, 800, 800, 0, 0, 1, overlay_window, "waterrower", main_window_callback, window), "open overlay window") != SUCCESS){
+			resetAppFlag(APP_RUNNING);
+			return GENERIC_ERROR;		//Fehler wird oben schon ausgegeben
+		};
+		SetWindowLong(overlay_window, GWL_STYLE, WS_VISIBLE);
+		SetWindowLong(overlay_window, GWL_EXSTYLE, WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT);
+		SetLayeredWindowAttributes(overlay_window, RGB(0, 0, 0), 0, LWA_COLORKEY);
+		SetWindowPos(overlay_window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+		allocPageData(main_page, &overlay_window, sizeof(overlay_window));
+	}
 
 	WORD idx = 0;
 	ErrCheck(getWindow(window, idx));
@@ -603,9 +650,10 @@ ErrCode switchToCreateWorkoutPage(HWND window){
 void runWorkout(HWND window){
 #ifndef NO_DEVICE
 		refreshData(queue);
+//		if(!getWorkoutFlag(*workout, WORKOUT_RUNNING)) return;
 #endif
 	if(!updateWorkout(*workout, rowingData.dist.upper - workout->distance)){
-		main_page.menus[0]->labels[0].text = "Distanz: " + std::to_string(rowingData.dist.upper) + '.' + std::to_string(rowingData.dist.lower) + 'm';
+		main_page.menus[0]->labels[0].text = "Distanz: " + intToString(rowingData.dist.upper, 0) + '.' + intToString(rowingData.dist.lower, 0) + 'm';
 		main_page.menus[0]->labels[2].text = "Zielgeschwindigkeit: " + intToString(workout->intensity) + "m/s";
 		main_page.menus[0]->labels[1].text = "Durchschnittlich: " + intToString(rowingData.ms_avg) + "m/s";
 		if(getWorkoutFlag(*workout, WORKOUT_INTENSITY)){
@@ -618,9 +666,28 @@ void runWorkout(HWND window){
 		WORD hrs = workout->duration/3600;
 		WORD min = (workout->duration/60)%60;
 		WORD sec = workout->duration%60;
-		main_page.menus[0]->labels[3].text = "Zeit: " + std::to_string(hrs) + ':' + std::to_string(min) + ':' + std::to_string(sec);
+		main_page.menus[0]->labels[3].text = "Zeit: " + intToString(hrs, 0) + ':' + intToString(min, 0) + ':' + intToString(sec, 0);
 
 		if(getWorkoutFlag(*workout, WORKOUT_SIMULATION)) updateVirtualRowing2D(*simulation2D, window, *default_font, rowingData.ms_avg);
+		if(getWorkoutFlag(*workout, WORKOUT_OVERLAY) && app.window_count > 1){
+			WORD offset = 0;
+			WORD window_idx;
+			WORD fontSize = default_font->font_size;
+			default_font->font_size = 48;
+			if(ErrCheck(getWindow(*(HWND*)main_page.data, window_idx)) != SUCCESS) return;
+			for(size_t i=0; i < main_page.menus[0]->labels[0].text.size(); ++i){
+				offset += drawFontChar(window_idx, *default_font, main_page.menus[0]->labels[0].text[i], 10+offset, 10);
+			}
+			offset = 0;
+			for(size_t i=0; i < main_page.menus[0]->labels[1].text.size(); ++i){
+				offset += drawFontChar(window_idx, *default_font, main_page.menus[0]->labels[1].text[i], 10+offset, default_font->font_size+20);
+			}
+			offset = 0;
+			for(size_t i=0; i < main_page.menus[0]->labels[3].text.size(); ++i){
+				offset += drawFontChar(window_idx, *default_font, main_page.menus[0]->labels[3].text[i], 10+offset, default_font->font_size*2+30);
+			}
+			default_font->font_size = fontSize;
+		}
 
 	}else{
 		if(getWorkoutFlag(*workout, WORKOUT_DONE)){
@@ -641,11 +708,28 @@ void runWorkout(HWND window){
 }
 ErrCode switchToWorkoutPage(HWND window){
 	destroyPageNoFont(main_page);
+
 	workout->distance = 0;
+	resetWorkoutFlag(*workout, WORKOUT_RUNNING);
 
 	//TODO Sollte eine Option sein
 	setWorkoutFlag(*workout, WORKOUT_INTENSITY);
 	if(getWorkoutFlag(*workout, WORKOUT_SIMULATION)) initVirtualRowing2D(*simulation2D, workout->intensity);
+
+	//TODO öffne ein Overlayfenster (nach Wunsch) auf welchem die Ruderdaten angezeigt werden
+	if(app.window_count <= 1){
+		HWND overlay_window;
+		if(ErrCheck(openWindow(ghInstance, 800, 800, 0, 0, 1, overlay_window, "waterrower", main_window_callback, window), "open overlay window") != SUCCESS){
+			resetAppFlag(APP_RUNNING);
+			return GENERIC_ERROR;		//Fehler wird oben schon ausgegeben
+		};
+		SetWindowLong(overlay_window, GWL_STYLE, WS_VISIBLE);
+		SetWindowLong(overlay_window, GWL_EXSTYLE, WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT);
+		SetLayeredWindowAttributes(overlay_window, RGB(0, 0, 0), 0, LWA_COLORKEY);
+		SetWindowPos(overlay_window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+		setWorkoutFlag(*workout, WORKOUT_OVERLAY);
+		allocPageData(main_page, &overlay_window, sizeof(overlay_window));
+	}
 
 #ifndef NO_DEVICE
 	strcpy((char*)sendBuffer, "RESET");
