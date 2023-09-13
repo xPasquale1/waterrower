@@ -123,6 +123,7 @@ void printPacket(BYTE* buffer, int length){
 	std::cout << std::endl;
 }
 
+//TODO Breche die Kommunikation nach einer Zeit ab, falls keine Antworten kommen oder es Falsche sind
 int initCommunication(HANDLE hDevice, BYTE* sendBuffer, BYTE* receiveBuffer){
 	int length;
 	strcpy((char*)sendBuffer, "USB");

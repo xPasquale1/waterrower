@@ -23,7 +23,7 @@ BYTE receiveBuffer[128];
 BYTE sendBuffer[128];
 RequestQueue queue;
 Page main_page;
-BYTE page_select = 0;	//0 Startseite, 1 free training Seite
+BYTE page_select = 0;
 Font* default_font = nullptr;
 //Workouts
 Workout* workout = nullptr;
@@ -84,6 +84,7 @@ void renderFunc(){
 		updatePage(main_page, main_window);
 		drawWindows();
 		handleSignals(main_window);
+		getMessages();
 		SYSTEMTIME t2;
 		GetSystemTime(&t2);
 		unsigned long long millis = t2.wMilliseconds-t1.wMilliseconds+(t2.wMinute-t1.wMinute)*60+(t2.wHour-t1.wHour)*3600;
@@ -94,13 +95,13 @@ void renderFunc(){
 
 INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd){
 	ghInstance = hInstance;
-	if(ErrCheck(initApp()) != SUCCESS) return -1;
+	if(ErrCheck(initApp(), "App öffnen") != SUCCESS) return -1;
 
 #ifndef NO_DEVICE
 	//TODO testet nur Port 1-10 für Geräte und auch nicht ob es ein waterrower ist
 	for(WORD i=1; i <= 10; ++i){
 		std::string port = "\\\\.\\COM" + std::to_string(i);
-		if(ErrCheck(openDevice(hDevice, port.c_str(), 19200)) == SUCCESS){
+		if(ErrCheck(openDevice(hDevice, port.c_str(), 19200), "USB-Gerät öffnen") == SUCCESS){
 			break;
 		};
 	}
@@ -153,7 +154,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	sendPacket(hDevice, sendBuffer, sizeof("EXIT")-1);
 	CloseHandle(hDevice);
 #endif
-	closeApp();
+	ErrCheck(closeApp(), "App schließen");
 	return 0;
 }
 
@@ -166,6 +167,7 @@ LRESULT CALLBACK main_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARA
 	case WM_SIZE:{
 		UINT width = LOWORD(lParam);
 		UINT height = HIWORD(lParam);
+		if(!width || !height) break;
 		ErrCheck(setWindowFlag(hwnd, WINDOW_RESIZE), "setzte resize Fensterstatus");
 		ErrCheck(resizeWindow(hwnd, width, height, 1), "Fenster skalieren");
         break;
@@ -212,14 +214,13 @@ LRESULT CALLBACK main_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARA
 }
 
 ErrCode handleSignals(HWND window){
-	getMessages();
 	for(int i=0; i < app.window_count; ++i){
 		HWND windowIter = app.windows[i];
 		WINDOWFLAGS state;
 		while((state = getNextWindowState(windowIter))){
 			switch(state){
 			case WINDOW_CLOSE:
-				ErrCheck(closeWindow(windowIter));
+				ErrCheck(closeWindow(windowIter), "Fenster schließen");
 				if(app.window_count == 0) resetAppFlag(APP_RUNNING);
 				--i;
 				goto whileend;	//TODO Nix gut
@@ -380,7 +381,7 @@ ErrCode switchToFreeTrainingPage(HWND window){
 	//TODO öffne ein Overlayfenster (nach Wunsch) auf welchem die Ruderdaten angezeigt werden
 	if(app.window_count <= 1){
 		HWND overlay_window;
-		if(ErrCheck(openWindow(ghInstance, 800, 800, 0, 0, 1, overlay_window, "waterrower", main_window_callback, window), "open overlay window") != SUCCESS){
+		if(ErrCheck(openWindow(ghInstance, 800, 800, 0, 0, 1, overlay_window, "waterrower", main_window_callback, window), "Overlayfenster öffnen") != SUCCESS){
 			resetAppFlag(APP_RUNNING);
 			return GENERIC_ERROR;		//Fehler wird oben schon ausgegeben
 		};
@@ -719,7 +720,7 @@ ErrCode switchToWorkoutPage(HWND window){
 	//TODO öffne ein Overlayfenster (nach Wunsch) auf welchem die Ruderdaten angezeigt werden
 	if(app.window_count <= 1){
 		HWND overlay_window;
-		if(ErrCheck(openWindow(ghInstance, 800, 800, 0, 0, 1, overlay_window, "waterrower", main_window_callback, window), "open overlay window") != SUCCESS){
+		if(ErrCheck(openWindow(ghInstance, 800, 800, 0, 0, 1, overlay_window, "waterrower", main_window_callback, window), "Overlayfenster öffnen") != SUCCESS){
 			resetAppFlag(APP_RUNNING);
 			return GENERIC_ERROR;		//Fehler wird oben schon ausgegeben
 		};

@@ -50,7 +50,14 @@ inline ErrCode initApp(){
 
 inline ErrCode closeApp(){
 	for(WORD i=0; i < app.window_count; ++i){
-		DestroyWindow(app.windows[i]);
+		if(!DestroyWindow(app.windows[i])){
+			std::cerr << GetLastError() << std::endl;
+			return GENERIC_ERROR;
+		}
+		if(!UnregisterClassA(app.info[i].windowClassName.c_str(), nullptr)){
+			std::cerr << GetLastError() << std::endl;
+			return GENERIC_ERROR;
+		}
 		app.info[i].renderTarget->Release();
 		delete[] app.pixels[i];
 	}
@@ -146,7 +153,7 @@ ErrCode openWindow(HINSTANCE hInstance, LONG window_width, LONG window_height, L
 
 	//Erstelle das Fenster
 	app.windows[app.window_count] = CreateWindow(window_class.lpszClassName, name, WS_VISIBLE | WS_OVERLAPPEDWINDOW, x, y, w, h, parentWindow, NULL, hInstance, NULL);
-	if(!window){
+	if(window == NULL){
 		std::cerr << GetLastError() << std::endl;
 		return CREATE_WINDOW;
 	}
@@ -184,7 +191,10 @@ ErrCode closeWindow(HWND window){
 		if(app.windows[i] == window){
 			DestroyWindow(app.windows[i]);
 			app.info[i].renderTarget->Release();
-			if(!UnregisterClassA(app.info[i].windowClassName.c_str(), nullptr)) return WINDOW_NOT_FOUND;	//TODO ne
+			if(!UnregisterClassA(app.info[i].windowClassName.c_str(), nullptr)){
+				std::cerr << GetLastError() << std::endl;
+				return GENERIC_ERROR;
+			}
 			delete[] app.pixels[i];
 			for(WORD j=i; j < app.window_count-1; ++j){
 				app.windows[j] = app.windows[j+1];
@@ -201,30 +211,16 @@ ErrCode closeWindow(HWND window){
 LRESULT CALLBACK default_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 	switch(uMsg){
 	case WM_DESTROY:{
-		ErrCheck(closeWindow(hwnd), "schließe Fenster");
+		ErrCheck(setWindowFlag(hwnd, WINDOW_CLOSE), "setze close Fensterstatus");
 		break;
 	}
 	case WM_SIZE:{
 		UINT width = LOWORD(lParam);
 		UINT height = HIWORD(lParam);
-		ErrCheck(resizeWindow(hwnd, width, height, 2));
+		if(!width || !height) break;
+		ErrCheck(setWindowFlag(hwnd, WINDOW_RESIZE), "setzte resize Fensterstatus");
+		ErrCheck(resizeWindow(hwnd, width, height, 1), "Fenster skalieren");
         break;
-	}
-	case WM_LBUTTONDOWN:{
-		setButton(mouse, MOUSE_LMB);
-		break;
-	}
-	case WM_LBUTTONUP:{
-		resetButton(mouse, MOUSE_LMB);
-		break;
-	}
-	case WM_RBUTTONDOWN:{
-		setButton(mouse, MOUSE_RMB);
-		break;
-	}
-	case WM_RBUTTONUP:{
-		resetButton(mouse, MOUSE_RMB);
-		break;
 	}
 	case WM_MOUSEMOVE:{
 		for(WORD i=0; i < app.window_count; ++i){
@@ -444,6 +440,7 @@ ErrCode loadImage(const char* name, Image& image){
 
 void destroyImage(Image& image){
 	delete[] image.data;
+	image.data = nullptr;
 }
 
 //x und y von 0 - 1
@@ -624,7 +621,7 @@ struct Button{
 };
 
 void destroyButton(Button& button){
-	delete[] button.image;	//nullptr check sollte nicht nötig sein
+	destroyImage(*button.image);
 }
 
 inline constexpr bool checkButtonState(Button& button, BUTTONFLAGS state){return (button.flags&state);}
@@ -715,7 +712,7 @@ struct Menu{
 
 void destroyMenu(Menu& menu){
 	for(WORD i=0; i < menu.image_count; ++i){
-		delete[] menu.images[i];	//nullptr check sollte nicht nötig sein
+		destroyImage(*menu.images[i]);
 	}
 }
 

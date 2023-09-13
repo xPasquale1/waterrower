@@ -47,7 +47,7 @@ void allocPageData(Page& page, void* data, WORD bytes){
 
 //Löscht die Daten von page.data
 void destroyPageData(Page& page){
-	delete[] page.data;		//TODO meh
+	delete[] page.data;
 	page.data = nullptr;
 }
 
@@ -55,11 +55,9 @@ void destroyPageData(Page& page){
 void destroyPageNoFont(Page& page){
 	for(WORD i=0; i < page.menu_count; ++i){
 		destroyMenu(*page.menus[i]);
-		delete page.menus[i];
 	}
 	for(WORD i=0; i < page.image_count; ++i){
 		destroyImage(*page.images[i]);
-		delete page.images[i];
 	}
 	destroyPageData(page);
 	page.menu_count = 0;
@@ -69,15 +67,13 @@ void destroyPageNoFont(Page& page){
 //Löscht die gespeicherte Font mit!
 void destroyPage(Page& page){
 	for(WORD i=0; i < page.menu_count; ++i){
-		delete page.menus[i];
+		destroyMenu(*page.menus[i]);
 	}
 	for(WORD i=0; i < page.image_count; ++i){
 		destroyImage(*page.images[i]);
-		delete page.images[i];
 	}
 	if(page.font){
 		destroyImage(page.font->image);
-		delete page.font;
 	}
 	destroyPageData(page);
 	page.menu_count = 0;

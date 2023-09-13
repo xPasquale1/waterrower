@@ -1,4 +1,6 @@
 Mehr nützliche Daten auslesen können
 Sollte die Applikation erst starten und dann verbinden auf Wunsch, voher können keine Workouts,... gestartet werden
-Die Distanz könnte ja auf 3Byte erweitert werden, da 65km max. doch relativ klein ist
+Die Distanz könnte ja auf 3Byte erweitert werden, da 65km max. doch "relativ" klein ist
+Overlays nur nach Wunsch öffnen
+Workouts erst starten nach Countdown oder nachdem der erste Zug getätigt wurde
 Video abspielen oder virtuelle Welt erzeugen
