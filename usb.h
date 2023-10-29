@@ -10,11 +10,11 @@ extern "C"{
 #define SILENT		//Packete werden nicht in den output stream geschrieben
 //#define SHOW_ERRORS	//Überschreibt SILENT nur für Fehlernachrichten
 
-//ret: Handle für das Gerät
+//TODO sollte nicht GetLastError() in den cerr schreiben sondern diese sollten auch ErrorCodes sein
 ErrCode openDevice(HANDLE& handle, const char* devicePath = "\\\\.\\COM3", DWORD baudrate = 9600){
 	HANDLE hDevice = CreateFile(devicePath, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0);
 	if(hDevice == INVALID_HANDLE_VALUE){
-		std::cerr << GetLastError() << std::endl;
+//		std::cerr << GetLastError() << std::endl;
 		return INVALID_USB_HANDLE;
 	}
     DCB dcbSerialParams = {};
@@ -22,7 +22,7 @@ ErrCode openDevice(HANDLE& handle, const char* devicePath = "\\\\.\\COM3", DWORD
 	//Konfiguriere die Schnittstelle (Baudrate, Datenbits, Parität, Stoppbits)
 	dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
 	if(!GetCommState(hDevice, &dcbSerialParams)){
-		std::cerr << GetLastError() << std::endl;
+//		std::cerr << GetLastError() << std::endl;
 		CloseHandle(hDevice);
 		return COMMSTATE_ERROR;
 	}
@@ -31,7 +31,7 @@ ErrCode openDevice(HANDLE& handle, const char* devicePath = "\\\\.\\COM3", DWORD
 	dcbSerialParams.StopBits = ONESTOPBIT;
 	dcbSerialParams.Parity = NOPARITY;
 	if(!SetCommState(hDevice, &dcbSerialParams)){
-		std::cerr << GetLastError() << std::endl;
+//		std::cerr << GetLastError() << std::endl;
 		CloseHandle(hDevice);
 		return COMMSTATE_ERROR;
 	}
@@ -42,11 +42,17 @@ ErrCode openDevice(HANDLE& handle, const char* devicePath = "\\\\.\\COM3", DWORD
 	timeouts.WriteTotalTimeoutMultiplier = 0;
 	timeouts.WriteTotalTimeoutConstant = 0;
 	if(!SetCommTimeouts(hDevice, &timeouts)){
-		std::cerr << GetLastError() << std::endl;
+//		std::cerr << GetLastError() << std::endl;
 		CloseHandle(hDevice);
 		return TIMEOUT_SET_ERROR;
 	}
 	handle = hDevice;
+	return SUCCESS;
+}
+
+ErrCode closeDevice(HANDLE& handle){
+	CloseHandle(handle);
+	handle = nullptr;
 	return SUCCESS;
 }
 
@@ -98,6 +104,7 @@ int readPacket(HANDLE hDevice, BYTE* data, DWORD length){
 
 //Sendet die Daten mit allen nötigen zusätzlichen Zeichen (max. 48 Bytes Nutzdaten)
 //-1 falls Daten mehr wie 48 Byte enthalten oder API Fehler
+//TODO ErrCodes
 int sendPacket(HANDLE hDevice, BYTE* data, DWORD length){
 	if(length > 48) return -1;
 	BYTE packet[50];
@@ -159,16 +166,6 @@ struct RequestQueue{
 	WORD request_ptr2 = 0;
 };
 
-//TODO für alle machen und unten einfügen
-#define DISTANCECODE "054"
-#define DISTANCELOCATION "IRT054"
-#define SECONDSCODE "1E1"
-#define SECONDSLOCATION "IRS1E1"
-#define MINUTESCODE "1E2"
-#define MINUTESLOCATION "IRS1E2"
-#define HOURSCODE "1E3"
-#define HOURSLOCATION "IRS1E3"
-
 //Fügt eine request in die Warteschlange ein, id gibt die request an
 ErrCode addRequest(RequestQueue& queue, DWORD id){
 	if((queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE) == queue.request_ptr2) return QUEUE_FULL;	//Warteschlange voll
@@ -181,19 +178,19 @@ ErrCode addRequest(RequestQueue& queue, DWORD id){
 	}
 	case 1:{	//Sekundenabfrage
 		strcpy((char*)queue.requests[queue.request_ptr1].data, "IRS1E1");
-		queue.requests[queue.request_ptr1].length = sizeof("IRS1e1")-1;
+		queue.requests[queue.request_ptr1].length = sizeof("IRS1E1")-1;
 		queue.request_ptr1 = (queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE);
 		return SUCCESS;
 	}
 	case 2:{	//Minutenabfrage
 		strcpy((char*)queue.requests[queue.request_ptr1].data, "IRS1E2");
-		queue.requests[queue.request_ptr1].length = sizeof("IRS1e2")-1;
+		queue.requests[queue.request_ptr1].length = sizeof("IRS1E2")-1;
 		queue.request_ptr1 = (queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE);
 		return SUCCESS;
 	}
 	case 3:{	//Stundenabfrage
 		strcpy((char*)queue.requests[queue.request_ptr1].data, "IRS1E3");
-		queue.requests[queue.request_ptr1].length = sizeof("IRS1e3")-1;
+		queue.requests[queue.request_ptr1].length = sizeof("IRS1E3")-1;
 		queue.request_ptr1 = (queue.request_ptr1+1)%(REQUEST_QUEUE_SIZE);
 		return SUCCESS;
 	}

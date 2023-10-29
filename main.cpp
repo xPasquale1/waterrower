@@ -30,11 +30,12 @@ Workout* workout = nullptr;
 VirtualRowing2D* simulation2D = nullptr;
 
 LRESULT CALLBACK main_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-ErrCode loadStartPage(){setPageFlag(main_page, PAGE_LOAD); page_select = 0; return SUCCESS;}
-ErrCode loadFreeTrainingPage(){setPageFlag(main_page, PAGE_LOAD); page_select = 1; return SUCCESS;}
-ErrCode loadStatistikPage(){setPageFlag(main_page, PAGE_LOAD); page_select = 2; return SUCCESS;}
-ErrCode loadWorkoutCreatePage(){setPageFlag(main_page, PAGE_LOAD); page_select = 3; return SUCCESS;}
-ErrCode loadWorkoutPage(){
+ErrCode loadStartPage(BYTE*){setPageFlag(main_page, PAGE_LOAD); page_select = 0; return SUCCESS;}
+ErrCode loadFreeTrainingPage(BYTE*){setPageFlag(main_page, PAGE_LOAD); page_select = 1; return SUCCESS;}
+ErrCode loadStatistikPage(BYTE*){setPageFlag(main_page, PAGE_LOAD); page_select = 2; return SUCCESS;}
+ErrCode loadWorkoutCreatePage(BYTE*){setPageFlag(main_page, PAGE_LOAD); page_select = 3; return SUCCESS;}
+ErrCode loadOpenDevicePage(BYTE*){setPageFlag(main_page, PAGE_LOAD); page_select = 5; return SUCCESS;}
+ErrCode loadWorkoutPage(BYTE*){
 	setPageFlag(main_page, PAGE_LOAD);
 	page_select = 4;
 	initWorkout(*workout);
@@ -45,6 +46,7 @@ ErrCode switchToFreeTrainingPage(HWND window);
 ErrCode switchToStatistikPage(HWND window);
 ErrCode switchToCreateWorkoutPage(HWND window);
 ErrCode switchToWorkoutPage(HWND window);
+ErrCode switchToOpenDevicePage(HWND window);
 ErrCode handleSignals(HWND window);
 void refreshData(RequestQueue& queue, WORD interval=250){
 	static SYSTEMTIME last_request_tp2 = {};
@@ -97,23 +99,7 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	ghInstance = hInstance;
 	if(ErrCheck(initApp(), "App öffnen") != SUCCESS) return -1;
 
-#ifndef NO_DEVICE
-	//TODO testet nur Port 1-10 für Geräte und auch nicht ob es ein waterrower ist
-	for(WORD i=1; i <= 10; ++i){
-		std::string port = "\\\\.\\COM" + std::to_string(i);
-		if(ErrCheck(openDevice(hDevice, port.c_str(), 19200), "USB-Gerät öffnen") == SUCCESS){
-			break;
-		};
-	}
-	if(!hDevice){
-		std::cerr << "Konnte kein Gerät finden!" << std::endl;
-		return -1;
-	}
-#endif
-
-#ifndef NO_DEVICE
-	initCommunication(hDevice, sendBuffer, receiveBuffer);
-#endif
+//	initCommunication(hDevice, sendBuffer, receiveBuffer);
 
 	//TODO remove
 	const char* boat_images[] = {"textures/boat.tex", "textures/boat.tex", "textures/boat.tex", "textures/boat.tex"};
@@ -124,20 +110,20 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	default_font->font_size = 31;
 	main_page.font = default_font;
 
-	ErrCheck(loadStartPage(), "laden des Startbildschirms");
+	ErrCheck(loadStartPage(nullptr), "laden des Startbildschirms");
 	setAppFlag(APP_RUNNING);
 
 	std::thread render_thread(renderFunc);
 
 	while(getAppFlag(APP_RUNNING)){
-#ifndef NO_DEVICE
-		transmitRequests(queue, hDevice);
+		if(getAppFlag(APP_HAS_DEVICE)){
+			transmitRequests(queue, hDevice);
 
-		int length = readPacket(hDevice, receiveBuffer, sizeof(receiveBuffer));
-		if(length > 0){
-			checkCode(receiveBuffer, length);
+			int length = readPacket(hDevice, receiveBuffer, sizeof(receiveBuffer));
+			if(length > 0){
+				checkCode(receiveBuffer, length);
+			}
 		}
-#endif
 	}
 
 	//TODO remove
@@ -149,11 +135,11 @@ INT WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	destroyPageNoFont(main_page);
 	destroyFont(default_font);
 	destroyWorkout(workout);
-#ifndef NO_DEVICE
-	strcpy((char*)sendBuffer, "EXIT");
-	sendPacket(hDevice, sendBuffer, sizeof("EXIT")-1);
-	CloseHandle(hDevice);
-#endif
+	if(getAppFlag(APP_HAS_DEVICE)){
+		strcpy((char*)sendBuffer, "EXIT");
+		sendPacket(hDevice, sendBuffer, sizeof("EXIT")-1);
+		closeDevice(hDevice);
+	}
 	ErrCheck(closeApp(), "App schließen");
 	return 0;
 }
@@ -168,7 +154,7 @@ LRESULT CALLBACK main_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARA
 		UINT width = LOWORD(lParam);
 		UINT height = HIWORD(lParam);
 		if(!width || !height) break;
-		ErrCheck(setWindowFlag(hwnd, WINDOW_RESIZE), "setzte resize Fensterstatus");
+		ErrCheck(setWindowFlag(hwnd, WINDOW_RESIZE), "setze resize Fensterstatus");
 		ErrCheck(resizeWindow(hwnd, width, height, 1), "Fenster skalieren");
         break;
 	}
@@ -223,7 +209,7 @@ ErrCode handleSignals(HWND window){
 				ErrCheck(closeWindow(windowIter), "Fenster schließen");
 				if(app.window_count == 0) resetAppFlag(APP_RUNNING);
 				--i;
-				goto whileend;	//TODO Nix gut
+				goto whileend;
 				break;
 			case WINDOW_RESIZE:
 				setPageFlag(main_page, PAGE_LOAD);
@@ -232,7 +218,7 @@ ErrCode handleSignals(HWND window){
 				break;
 			}
 		}
-		whileend:;		//TODO Nix gut
+		whileend:;
 	}
 	PAGEFLAGSTYPE flag;
 	while((flag = getNextPageFlag(main_page))){
@@ -253,6 +239,9 @@ ErrCode handleSignals(HWND window){
 				break;
 			case 4:
 				switchToWorkoutPage(window);
+				break;
+			case 5:
+				switchToOpenDevicePage(window);
 				break;
 			}
 		}
@@ -287,7 +276,10 @@ ErrCode switchToStartPage(HWND window){
 	Image* buttonImage = new Image;
 	ErrCheck(loadImage("textures/button.tex", *buttonImage), "button image laden");
 	menu1->images[0] = buttonImage;
-	menu1->image_count = 1;
+	Image* disabledButtonImage = new Image;
+	ErrCheck(loadImage("textures/button_disabled.tex", *disabledButtonImage), "ausgeschalteter button image laden");
+	menu1->images[1] = disabledButtonImage;
+	menu1->image_count = 2;
 
 	ivec2 pos = {(int)(windowInfo.window_width/windowInfo.pixel_size*0.125), (int)(windowInfo.window_height/windowInfo.pixel_size*0.125)};
 	ivec2 size = {(int)(windowInfo.window_height/windowInfo.pixel_size*0.1)*4, (int)(windowInfo.window_height/windowInfo.pixel_size*0.1)};
@@ -298,7 +290,9 @@ ErrCode switchToStartPage(HWND window){
 	menu1->buttons[0].event = loadFreeTrainingPage;
 	menu1->buttons[0].text = "Freies Training";
 	menu1->buttons[0].image = buttonImage;
+	menu1->buttons[0].disabled_image = disabledButtonImage;
 	menu1->buttons[0].textsize = size.y/2;
+	if(!getAppFlag(APP_HAS_DEVICE)) setButtonFlag(menu1->buttons[0], BUTTON_DISABLED);
 	menu1->buttons[1].pos = {pos.x, pos.y+size.y+(int)(windowInfo.window_height/windowInfo.pixel_size*0.0125)};
 	menu1->buttons[1].size = {size.x, size.y};
 	menu1->buttons[1].repos = {(int)(pos.x-size.x*0.05), (int)(menu1->buttons[1].pos.y-size.y*0.05)};
@@ -306,6 +300,7 @@ ErrCode switchToStartPage(HWND window){
 	menu1->buttons[1].event = loadStatistikPage;
 	menu1->buttons[1].text = "Statistiken";
 	menu1->buttons[1].image = buttonImage;
+	menu1->buttons[1].disabled_image = disabledButtonImage;
 	menu1->buttons[1].textsize = size.y/2;
 	menu1->buttons[2].pos = {pos.x, pos.y+size.y*2+(int)(windowInfo.window_height/windowInfo.pixel_size*0.0125*2)};
 	menu1->buttons[2].size = {size.x, size.y};
@@ -314,8 +309,19 @@ ErrCode switchToStartPage(HWND window){
 	menu1->buttons[2].event = loadWorkoutCreatePage;
 	menu1->buttons[2].text = "Workouts";
 	menu1->buttons[2].image = buttonImage;
+	menu1->buttons[2].disabled_image = disabledButtonImage;
 	menu1->buttons[2].textsize = size.y/2;
-	menu1->button_count = 3;
+	if(!getAppFlag(APP_HAS_DEVICE)) setButtonFlag(menu1->buttons[2], BUTTON_DISABLED);
+	menu1->buttons[3].pos = {pos.x, pos.y+size.y*3+(int)(windowInfo.window_height/windowInfo.pixel_size*0.0125*3)};
+	menu1->buttons[3].size = {size.x, size.y};
+	menu1->buttons[3].repos = {(int)(pos.x-size.x*0.05), (int)(menu1->buttons[3].pos.y-size.y*0.05)};
+	menu1->buttons[3].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
+	menu1->buttons[3].event = loadOpenDevicePage;
+	menu1->buttons[3].text = "Geraete";
+	menu1->buttons[3].image = buttonImage;
+	menu1->buttons[3].disabled_image = disabledButtonImage;
+	menu1->buttons[3].textsize = size.y/2;
+	menu1->button_count = 4;
 
 	main_page.menus[0] = menu1;
 	main_page.menu_count = 1;
@@ -353,7 +359,7 @@ void displayDataPage(HWND window){
 		default_font->font_size = fontSize;
 	}
 }
-ErrCode endFreeTraining(){
+ErrCode endFreeTraining(BYTE*){
 	if(rowingData.dist.upper){
 		Statistic s1;
 		s1.distance = rowingData.dist.upper;
@@ -367,7 +373,7 @@ ErrCode endFreeTraining(){
 			saveStatistic(s1, false);
 		}
 	}
-	ErrCheck(loadStartPage(), "freies Training zu Startseite");
+	ErrCheck(loadStartPage(nullptr), "freies Training zu Startseite");
 	return SUCCESS;
 }
 ErrCode switchToFreeTrainingPage(HWND window){
@@ -507,29 +513,29 @@ ErrCode switchToStatistikPage(HWND window){
 	return SUCCESS;
 }
 
-ErrCode incWorkoutTime(){
+ErrCode incWorkoutTime(BYTE*){
 	workout->duration += 60;
 	main_page.menus[0]->labels[0].text = "Dauer: " + std::to_string(workout->duration/60) + "min";
 	return SUCCESS;
 }
-ErrCode decWorkoutTime(){
+ErrCode decWorkoutTime(BYTE*){
 	if(workout->duration > 60) workout->duration -= 60;
 	main_page.menus[0]->labels[0].text = "Dauer: " + std::to_string(workout->duration/60) + "min";
 	return SUCCESS;
 }
-ErrCode incIntensityTime(){
+ErrCode incIntensityTime(BYTE*){
 	workout->intensity += 10;
 	setWorkoutFlag(*workout, WORKOUT_INTENSITY);
 	main_page.menus[0]->labels[1].text = "Zielgeschw.: " + intToString(workout->intensity) + "m/s";
 	return SUCCESS;
 }
-ErrCode decIntensityTime(){
+ErrCode decIntensityTime(BYTE*){
 	if(workout->intensity >= 10) workout->intensity -= 10;
 	if(workout->intensity == 0) resetWorkoutFlag(*workout, WORKOUT_INTENSITY);
 	main_page.menus[0]->labels[1].text = "Zielgeschw.: " + intToString(workout->intensity) + "m/s";
 	return SUCCESS;
 }
-ErrCode toggleSimulation(){
+ErrCode toggleSimulation(BYTE*){
 	workout->flags ^= WORKOUT_SIMULATION;
 	if(getWorkoutFlag(*workout, WORKOUT_SIMULATION)) main_page.menus[0]->buttons[6].text = "Simulation";
 	else main_page.menus[0]->buttons[6].text = "Keine Simulation";
@@ -783,6 +789,90 @@ ErrCode switchToWorkoutPage(HWND window){
 	main_page.menu_count = 1;
 
 	main_page.code = runWorkout;
+
+	return SUCCESS;
+}
+
+ErrCode selectDevice(BYTE* data){
+	std::string port = "\\\\.\\COM" + std::to_string(*data);
+	if(ErrCheck(openDevice(hDevice, port.c_str(), 19200)) == SUCCESS){
+		setAppFlag(APP_HAS_DEVICE);
+		loadStartPage(nullptr);
+	}
+	return SUCCESS;
+}
+ErrCode switchToOpenDevicePage(HWND window){
+	destroyPageNoFont(main_page);
+
+	resetAppFlag(APP_HAS_DEVICE);
+	closeDevice(hDevice);
+
+	WORD idx = 0;
+	ErrCheck(getWindow(window, idx));
+	WindowInfo& windowInfo = app.info[idx];
+
+	Image* backgroundImage = new Image;
+	ErrCheck(loadImage("textures/basic_dark.tex", *backgroundImage), "Hintergrund image laden");
+	main_page.images[0] = backgroundImage;
+	main_page.imageInfo[0].pos = {0, 0};
+	main_page.imageInfo[0].size = {windowInfo.window_width/windowInfo.pixel_size, windowInfo.window_height/windowInfo.pixel_size};
+	main_page.image_count = 1;
+
+	Menu* menu1 = new Menu;
+
+	Image* buttonImage = new Image;
+	ErrCheck(loadImage("textures/button.tex", *buttonImage), "button image laden");
+	menu1->images[0] = buttonImage;
+	menu1->image_count = 1;
+
+	//TODO testet nur Port 1-10 für Geräte
+	BYTE deviceNumbers[10];
+	BYTE device_count = 0;
+	for(WORD i=1; i <= 10; ++i){
+		std::string port = "\\\\.\\COM" + std::to_string(i);
+		if(openDevice(hDevice, port.c_str(), 19200) == SUCCESS){
+			deviceNumbers[device_count++] = i;
+			closeDevice(hDevice);
+		}
+	}
+
+	ivec2 pos = {(int)(windowInfo.window_width/windowInfo.pixel_size*0.125), windowInfo.window_height/windowInfo.pixel_size-(int)(windowInfo.window_height/windowInfo.pixel_size*0.2)};
+	ivec2 size = {(int)(windowInfo.window_height/windowInfo.pixel_size*0.1)*4, (int)(windowInfo.window_height/windowInfo.pixel_size*0.1)};
+	menu1->buttons[0].pos = {pos.x, pos.y};
+	menu1->buttons[0].size = {size.x, size.y};
+	menu1->buttons[0].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
+	menu1->buttons[0].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
+	menu1->buttons[0].event = loadStartPage;
+	menu1->buttons[0].text = "Startbildschirm";
+	menu1->buttons[0].image = buttonImage;
+	menu1->buttons[0].textsize = size.y/2;
+
+	pos.y = (int)(windowInfo.window_height/windowInfo.pixel_size*0.125);
+	for(BYTE i=1; i <= device_count; ++i){
+		menu1->buttons[i].pos = {pos.x, pos.y};
+		menu1->buttons[i].size = {size.x, size.y};
+		menu1->buttons[i].repos = {(int)(pos.x-size.x*0.05), (int)(pos.y-size.y*0.05)};
+		menu1->buttons[i].resize = {(int)(size.x+size.x*0.1), (int)(size.y+size.y*0.1)};
+		menu1->buttons[i].event = selectDevice;
+		menu1->buttons[i].text = "Port: " + std::to_string((int)deviceNumbers[i-1]);
+		menu1->buttons[i].data = new BYTE;
+		*menu1->buttons[i].data = deviceNumbers[i-1];
+		menu1->buttons[i].image = buttonImage;
+		menu1->buttons[i].textsize = size.y/2;
+		pos.y += size.y+(int)(windowInfo.window_height/windowInfo.pixel_size*0.0125);
+	}
+	menu1->button_count = 1+device_count;
+
+	WORD w = windowInfo.window_width/windowInfo.pixel_size;
+	WORD label_text_size = w*0.0775;
+	menu1->labels[0].pos = {20, 20};
+	menu1->labels[0].text_size = label_text_size;
+	menu1->label_count = 1;
+
+	main_page.menus[0] = menu1;
+	main_page.menu_count = 1;
+
+	main_page.code = _default_page_function;
 
 	return SUCCESS;
 }

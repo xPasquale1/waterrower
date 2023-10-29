@@ -23,7 +23,8 @@ struct WindowInfo{
 
 #define APPLICATIONFLAGSTYPE BYTE
 enum APPLICATIONFLAGS : APPLICATIONFLAGSTYPE{
-	APP_RUNNING = 1
+	APP_RUNNING=1,
+	APP_HAS_DEVICE=2
 };
 #define MAX_WINDOW_COUNT 10
 struct Application{
@@ -601,14 +602,20 @@ void destroyFont(Font*& font){
 	font = nullptr;
 }
 
-ErrCode _defaultEvent(void){return SUCCESS;}
+ErrCode _defaultEvent(BYTE*){return SUCCESS;}
 enum BUTTONFLAGS{
-	BUTTON_VISIBLE=1, BUTTON_CAN_HOVER=2, BUTTON_HOVER=4, BUTTON_PRESSED=8, BUTTON_TEXT_CENTER
+	BUTTON_VISIBLE=1,
+	BUTTON_CAN_HOVER=2,
+	BUTTON_HOVER=4,
+	BUTTON_PRESSED=8,
+	BUTTON_TEXT_CENTER=16,
+	BUTTON_DISABLED=32
 };
 struct Button{
-	ErrCode (*event)(void) = _defaultEvent;	//Funktionspointer zu einer Funktion die gecallt werden soll wenn der Button gedrückt wird
+	ErrCode (*event)(BYTE*) = _defaultEvent;	//Funktionspointer zu einer Funktion die gecallt werden soll wenn der Button gedrückt wird
 	std::string text;
 	Image* image = nullptr;
+	Image* disabled_image = nullptr;
 	ivec2 pos = {0, 0};
 	ivec2 repos = {0, 0};
 	ivec2 size = {50, 10};
@@ -617,28 +624,33 @@ struct Button{
 	uint color = RGBA(120, 120, 120);
 	uint hover_color = RGBA(120, 120, 255);
 	uint textcolor = RGBA(180, 180, 180);
+	uint disabled_color = RGBA(90, 90, 90);
 	WORD textsize = 16;
+	BYTE* data = nullptr;
 };
 
 void destroyButton(Button& button){
 	destroyImage(*button.image);
+	delete[] button.data;
 }
 
-inline constexpr bool checkButtonState(Button& button, BUTTONFLAGS state){return (button.flags&state);}
+inline constexpr void setButtonFlag(Button& button, BUTTONFLAGS flag){button.flags |= flag;}
+inline constexpr void resetButtonFlag(Button& button, BUTTONFLAGS flag){button.flags &= ~flag;}
+inline constexpr bool getButtonFlag(Button& button, BUTTONFLAGS flag){return (button.flags & flag);}
 //TODO kann bestimmt besser geschrieben werden... und ErrCheck aufs Event sollte mit einem BUTTONSTATE entschieden werden
 inline void buttonsClicked(Button* buttons, WORD button_count){
 	for(WORD i=0; i < button_count; ++i){
 		Button& b = buttons[i];
-		if(!checkButtonState(b, BUTTON_VISIBLE)) continue;
+		if(!getButtonFlag(b, BUTTON_VISIBLE) || getButtonFlag(b, BUTTON_DISABLED)) continue;
 		ivec2 delta = {mouse.pos.x - b.pos.x, mouse.pos.y - b.pos.y};
 		if(delta.x >= 0 && delta.x <= b.size.x && delta.y >= 0 && delta.y <= b.size.y){
-			if(checkButtonState(b, BUTTON_CAN_HOVER)) b.flags |= BUTTON_HOVER;
-			if(getButton(mouse, MOUSE_LMB) && !checkButtonState(b, BUTTON_PRESSED)){
-				ErrCheck(b.event());
+			if(getButtonFlag(b, BUTTON_CAN_HOVER)) b.flags |= BUTTON_HOVER;
+			if(getButton(mouse, MOUSE_LMB) && !getButtonFlag(b, BUTTON_PRESSED)){
+				ErrCheck(b.event(b.data));
 				b.flags |= BUTTON_PRESSED;
 			}
 			else if(!getButton(mouse, MOUSE_LMB)) b.flags &= ~BUTTON_PRESSED;
-		}else if(checkButtonState(b, BUTTON_CAN_HOVER)){
+		}else if(getButtonFlag(b, BUTTON_CAN_HOVER)){
 			b.flags &= ~BUTTON_HOVER;
 		}
 	}
@@ -647,19 +659,24 @@ inline void buttonsClicked(Button* buttons, WORD button_count){
 inline void drawButtons(HWND window, Font& font, Button* buttons, WORD button_count){
 	for(WORD i=0; i < button_count; ++i){
 		Button& b = buttons[i];
-		if(!checkButtonState(b, BUTTON_VISIBLE)) continue;
-		if(b.image == nullptr){
-			if(checkButtonState(b, BUTTON_CAN_HOVER) && checkButtonState(b, BUTTON_HOVER))
+		if(!getButtonFlag(b, BUTTON_VISIBLE)) continue;
+		if(getButtonFlag(b, BUTTON_DISABLED)){
+			if(b.disabled_image == nullptr)
+				drawRectangle(window, b.pos.x, b.pos.y, b.size.x, b.size.y, b.disabled_color);
+			else
+				copyImageToWindow(window, *b.disabled_image, b.pos.x, b.pos.y, b.pos.x+b.size.x, b.pos.y+b.size.y);
+		}else if(b.image == nullptr){
+			if(getButtonFlag(b, BUTTON_CAN_HOVER) && getButtonFlag(b, BUTTON_HOVER))
 				drawRectangle(window, b.pos.x, b.pos.y, b.size.x, b.size.y, b.hover_color);
 			else
 				drawRectangle(window, b.pos.x, b.pos.y, b.size.x, b.size.y, b.color);
 		}else{
-			if(checkButtonState(b, BUTTON_CAN_HOVER) && checkButtonState(b, BUTTON_HOVER)){
+			if(getButtonFlag(b, BUTTON_CAN_HOVER) && getButtonFlag(b, BUTTON_HOVER))
 				copyImageToWindow(window, *b.image, b.repos.x, b.repos.y, b.repos.x+b.resize.x, b.repos.y+b.resize.y);
-			}else
+			else
 				copyImageToWindow(window, *b.image, b.pos.x, b.pos.y, b.pos.x+b.size.x, b.pos.y+b.size.y);
 		}
-		if(checkButtonState(b, BUTTON_TEXT_CENTER)){
+		if(getButtonFlag(b, BUTTON_TEXT_CENTER)){
 			uint offset = 0;
 			WORD tmp_font_size = font.font_size;
 			font.font_size = b.textsize;
@@ -685,7 +702,6 @@ inline void updateButtons(HWND window, Font& font, Button* buttons, WORD button_
 	drawButtons(window, font, buttons, button_count);
 }
 
-//Speichert und zeigt x Buttons und strings an
 struct Label{
 	std::string text;
 	ivec2 pos = {0, 0};
@@ -694,20 +710,21 @@ struct Label{
 };
 
 enum MENUFLAGS{
-	MENU_OPEN=1, MENU_OPEN_TOGGLE=2
+	MENU_OPEN=1,
+	MENU_OPEN_TOGGLE=2
 };
 #define MAX_BUTTONS 10
 #define MAX_STRINGS 20
 #define MAX_IMAGES 5
 struct Menu{
-	Image* images[MAX_IMAGES];
-	WORD image_count = 0;
+	Image* images[MAX_IMAGES];	//Sind für die Buttons
+	BYTE image_count = 0;
 	Button buttons[MAX_BUTTONS];
-	WORD button_count = 0;
+	BYTE button_count = 0;
 	BYTE flags = MENU_OPEN;	//Bits: offen, toggle bit für offen, Rest ungenutzt
 	ivec2 pos = {};			//TODO Position in Bildschirmpixelkoordinaten
 	Label labels[MAX_STRINGS];
-	WORD label_count = 0;
+	BYTE label_count = 0;
 };
 
 void destroyMenu(Menu& menu){
@@ -716,9 +733,9 @@ void destroyMenu(Menu& menu){
 	}
 }
 
-inline constexpr bool checkMenuState(Menu& menu, MENUFLAGS state){return (menu.flags&state);}
+inline constexpr bool getMenuFlag(Menu& menu, MENUFLAGS state){return (menu.flags&state);}
 inline void updateMenu(HWND window, Menu& menu, Font& font){
-	if(checkMenuState(menu, MENU_OPEN)){
+	if(getMenuFlag(menu, MENU_OPEN)){
 		updateButtons(window, font, menu.buttons, menu.button_count);
 		for(WORD i=0; i < menu.label_count; ++i){
 			Label& label = menu.labels[i];
