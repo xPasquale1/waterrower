@@ -1,12 +1,12 @@
 #pragma once
 #include "window.h"
 
-/*	Idee: Man hat eine Kamera fest auf dem eigenen Boot und andere Boote die davor oder dahinter sein können,
+/*	Idee: Man hat eine Kamera fest auf dem eigenen Boot und andere Boote die davor oder dahinter sein kÃ¶nnen,
  *	jedes Boot hat eine Distanz gespeichert und so kann man berechnen ob diese davor oder dahinter sind,
  *	es wird angezeigt auf welchem Platz man ist und wie weit die anderen vor oder hinter einem sind.
- *	Die Boote sind so schnell wie die Intensität die man will +-(1-2%) das immer durchwechselt
- *	TODO überlegen wie man Animationen und de- und acceleration darstellen kann
- *	TODO ein/ein paar Boot/e könnten vllt immer schneller sein wie der Spieler damit dieser sich anstrengt,... mal sehen
+ *	Die Boote sind so schnell wie die IntensitÃ¤t die man will +-(1-2%) das immer durchwechselt
+ *	TODO Ã¼berlegen wie man Animationen und de- und acceleration darstellen kann
+ *	TODO ein/ein paar Boot/e kÃ¶nnten vllt immer schneller sein wie der Spieler damit dieser sich anstrengt,... mal sehen
  */
 
 #define BOATCOUNT_MAX 6
@@ -16,9 +16,9 @@ struct VirtualRowing2D{
 	Image boat_images[BOATCOUNT_MAX];		//Bilder der Boote
 	float distances[BOATCOUNT_MAX] = {};	//Distanz der einzelnen Boote
 	WORD speeds[BOATCOUNT_MAX];				//Geschwindigkeit der einzelnen Boote
-	WORD intensity = 360;					//Gewünschte Intensität die die Boote fahren sollen (in m/s)
+	WORD intensity = 360;					//GewÃ¼nschte IntensitÃ¤t die die Boote fahren sollen (in m/s)
 	SYSTEMTIME last_time;					//Letzter Zeitpunkt an dem die Simulation geupdated wurde
-	WORD millis = 0;						//Zählt die Millisekunden
+	WORD millis = 0;						//ZÃ¤hlt die Millisekunden
 };
 
 //Die Anzahl der Image Pfade muss gleich dem boat_count sein!
@@ -54,7 +54,7 @@ void initVirtualRowing2D(VirtualRowing2D& sim, WORD intensity){
 }
 
 //TODO Boote starten direkt mit der intensity, sollten am Start aber langsam beschleunigen, Messdaten notwendig
-void updateVirtualRowing2D(VirtualRowing2D& sim, HWND window, Font& font, WORD avg_ms){
+void updateVirtualRowing2D(VirtualRowing2D& sim, Window* window, Font& font, WORD avg_ms){
 	if(sim.boat_count < 1) return;
 	SYSTEMTIME tp;
 	GetSystemTime(&tp);
@@ -64,7 +64,7 @@ void updateVirtualRowing2D(VirtualRowing2D& sim, HWND window, Font& font, WORD a
 	millis += (tp.wHour-sim.last_time.wHour)*3600000;
 	sim.millis += millis;
 	float dt = millis/1000.f;
-	sim.last_time = tp;	//TODO Kopiert das ganze struct, unnötig
+	sim.last_time = tp;	//TODO Kopiert das ganze struct, unnÃ¶tig
 	//Update die Positionen der anderen Boote
 	for(BYTE i=1; i < sim.boat_count; ++i){
 		sim.distances[i] += sim.speeds[i]*0.01*dt;
@@ -78,30 +78,29 @@ void updateVirtualRowing2D(VirtualRowing2D& sim, HWND window, Font& font, WORD a
 		}
 	}
 	//Zeichne die Boote
-	WORD window_idx;
-	getWindow(window, window_idx);
-	WORD width = app.info[window_idx].window_width/app.info[window_idx].pixel_size;
-	WORD height = app.info[window_idx].window_height/app.info[window_idx].pixel_size;
+	if(window == nullptr) return;
+	WORD width = window->windowWidth/window->pixelSize;
+	WORD height = window->windowHeight/window->pixelSize;
 	WORD boat_positions = height/6;
 	WORD boat_size = boat_positions*0.8;
 	WORD boat_spacing = boat_positions*0.1;
 	//Zeichne das eigene Boot
 	float boat_y = (float)boat_size/sim.boat_images[0].height;
-	drawLine(window_idx, 0, 0, width-1, 0, RGBA(255, 255, 255));
-	copyImageToWindow(window_idx, sim.boat_images[0], width/2-sim.boat_images[0].width*boat_y/2, boat_spacing, width/2+sim.boat_images[0].width*boat_y/2, boat_spacing+boat_size);
+	drawLine(window, 0, 0, width-1, 0, RGBA(255, 255, 255));
+	copyImageToWindow(window, sim.boat_images[0], width/2-sim.boat_images[0].width*boat_y/2, boat_spacing, width/2+sim.boat_images[0].width*boat_y/2, boat_spacing+boat_size);
 	for(BYTE i=1; i < sim.boat_count; ++i){
 		WORD pos = boat_positions*i;
 		boat_y = (float)boat_size/sim.boat_images[i].height;
-		drawLine(window_idx, 0, pos, width-1, pos, RGBA(255, 255, 255));
+		drawLine(window, 0, pos, width-1, pos, RGBA(255, 255, 255));
 		float x_offset = (sim.distances[i]-sim.distances[0])*20.;
-		copyImageToWindowSave(window_idx, sim.boat_images[i], width/2-sim.boat_images[i].width*boat_y/2+x_offset, pos+boat_spacing, width/2+sim.boat_images[i].width*boat_y/2+x_offset, pos+boat_spacing+boat_size);
+		copyImageToWindowSave(window, sim.boat_images[i], width/2-sim.boat_images[i].width*boat_y/2+x_offset, pos+boat_spacing, width/2+sim.boat_images[i].width*boat_y/2+x_offset, pos+boat_spacing+boat_size);
 		if(x_offset <= 0){
 			WORD tmp = font.font_size;
 			font.font_size = boat_spacing*4;
 			std::string dist = floatToString(x_offset/20.) + 'm';
 			WORD offset = 0;
 			for(size_t i=0; i < dist.size(); ++i){
-				offset += drawFontChar(window_idx, font, dist[i], 10+offset, pos);
+				offset += drawFontChar(window, font, dist[i], 10+offset, pos);
 			}
 			font.font_size = tmp;
 		}
@@ -112,7 +111,7 @@ void updateVirtualRowing2D(VirtualRowing2D& sim, HWND window, Font& font, WORD a
 			WORD init_offset = getStringFontSize(font, dist);
 			WORD offset = 0;
 			for(size_t i=0; i < dist.size(); ++i){
-				offset += drawFontChar(window_idx, font, dist[i], width-init_offset-10+offset, pos);
+				offset += drawFontChar(window, font, dist[i], width-init_offset-10+offset, pos);
 			}
 			font.font_size = tmp;
 		}

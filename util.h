@@ -23,10 +23,12 @@ enum ErrCode{
 	FILE_NOT_FOUND,
 	QUEUE_FULL,
 	WINDOW_NOT_FOUND,
-	TOO_MANY_WINDOWS,
 	REQUEST_NOT_FOUND,
 	INVALID_WORKOUT,
 	INVALID_USB_HANDLE,
+	USB_RECEIVE_TIMEOUT,
+	USB_BAD_PROTOCOL,
+	INVALID_USB_PACKET,
 	COMMSTATE_ERROR,
 	TIMEOUT_SET_ERROR,
 	CODE_NOT_FOUND,
@@ -37,7 +39,7 @@ enum ErrCodeFlags{
 	ERR_NO_OUTPUT = 1,
 	ERR_ON_FATAL = 2
 };
-//TODO ERR_ON_FATAL ausgeben können wenn der nutzer es so möchte
+//TODO ERR_ON_FATAL ausgeben kï¿½nnen wenn der nutzer es so mï¿½chte
 inline ErrCode ErrCheck(ErrCode code, const char* msg="\0", ErrCodeFlags flags=ERR_NO_FLAG){
 	switch(code){
 	case BAD_ALLOC:
@@ -64,9 +66,6 @@ inline ErrCode ErrCheck(ErrCode code, const char* msg="\0", ErrCodeFlags flags=E
 	case WINDOW_NOT_FOUND:
 		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[WINDOW_NOT_FOUND ERROR] " << msg << std::endl;
 		return WINDOW_NOT_FOUND;
-	case TOO_MANY_WINDOWS:
-		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[TOO_MANY_WINDOWS ERROR] " << msg << std::endl;
-		return TOO_MANY_WINDOWS;
 	case REQUEST_NOT_FOUND:
 		if(!(flags&ERR_NO_OUTPUT)) std::cerr << "[REQUEST_NOT_FOUND ERROR] " << msg << std::endl;
 		return REQUEST_NOT_FOUND;
@@ -113,7 +112,7 @@ inline constexpr __attribute__((always_inline)) const char* stringLookUp2(long v
 	return &"001020304050607080900111213141516171819102122232425262728292"
 			"031323334353637383930414243444546474849405152535455565758595"
 			"061626364656667686960717273747576777879708182838485868788898"
-			"09192939495969798999"[value*2];
+			"09192939495969798999"[value<<1];
 }
 //std::to_string ist langsam, das ist simpel und schnell
 static char _dec_to_str_out[12] = "00000000000";
@@ -207,3 +206,8 @@ struct Keyboard{
 inline constexpr bool getButton(Keyboard& keyboard, KEYBOARDBUTTON button){return keyboard.buttons & button;}
 inline constexpr void setButton(Keyboard& keyboard, KEYBOARDBUTTON button){keyboard.buttons |= button;}
 inline constexpr void resetButton(Keyboard& keyboard, KEYBOARDBUTTON button){keyboard.buttons &= ~button;}
+
+//Zeitunterschied in Millisekunden
+inline constexpr long long systemTimeDiff(SYSTEMTIME& start, SYSTEMTIME& end){
+	return (end.wYear-start.wYear)*31536000000+(end.wDay-start.wDay)*86400000+(end.wHour-start.wHour)*3600000+(end.wMinute-start.wMinute)*60000+(end.wSecond-start.wSecond)*1000+end.wMilliseconds-start.wMilliseconds;
+}

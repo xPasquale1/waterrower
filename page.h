@@ -11,33 +11,33 @@ struct ImageInfo{
 enum PAGEFLAGS : PAGEFLAGSTYPE{
 	PAGE_LOAD=1
 };
-void _default_page_function(HWND){}
+void _default_page_function(Window*){}
 #define MAX_MENUS 2
 #define MAX_IMAGES 5
 struct Page{
 	PAGEFLAGSTYPE flags;									//Seitenflags
-	Menu* menus[MAX_MENUS];									//Menüs die die Seite beinhalten sollen
-	WORD menu_count = 0;									//Anzahl der Menüs auf der Seite
+	Menu* menus[MAX_MENUS];									//MenÃ¼s die die Seite beinhalten sollen
+	WORD menu_count = 0;									//Anzahl der MenÃ¼s auf der Seite
 	Image* images[MAX_IMAGES];								//Bilder die auf der Seite angezeigt werden sollen
 	ImageInfo imageInfo[MAX_IMAGES];						//Bilderinformation
 	WORD image_count = 0;									//Anzahl der Bilder
 	Font* font = nullptr;									//Font der Seite
-	void (*code)(HWND) = _default_page_function;			//updatePage führt diese Funktion immer aus
-	BYTE* data = nullptr;									//Zusätzliche Daten
+	void (*code)(Window*) = _default_page_function;			//updatePage fÃ¼hrt diese Funktion immer aus
+	BYTE* data = nullptr;									//ZusÃ¤tzliche Daten
 };
 
 constexpr inline void setPageFlag(Page& page, PAGEFLAGS flag){page.flags |= flag;}
 constexpr inline void resetPageFlag(Page& page, PAGEFLAGS flag){page.flags &= ~flag;}
 constexpr inline bool getPageFlag(Page& page, PAGEFLAGS flag){return page.flags & flag;}
 
-//Gibt das nächste gesetzte Flag zurück und resetet dieses anschließend
+//Gibt das nÃ¤chste gesetzte Flag zurÃ¼ck und resetet dieses anschlieÃŸend
 constexpr inline PAGEFLAGS getNextPageFlag(Page& page){
 	PAGEFLAGSTYPE flag = page.flags & -page.flags;
 	resetPageFlag(page, (PAGEFLAGS)flag);
 	return (PAGEFLAGS)flag;
 }
 
-//Kopiert die Daten von data in page.data, somit muss sich nicht um eine eigene Speicherverwaltung gekümmert werden
+//Kopiert die Daten von data in page.data, somit muss sich nicht um eine eigene Speicherverwaltung gekÃ¼mmert werden
 void allocPageData(Page& page, void* data, WORD bytes){
 	page.data = new BYTE[bytes];
 	for(WORD i=0; i < bytes; ++i){
@@ -45,13 +45,13 @@ void allocPageData(Page& page, void* data, WORD bytes){
 	}
 }
 
-//Löscht die Daten von page.data
+//LÃ¶scht die Daten von page.data
 void destroyPageData(Page& page){
 	delete[] page.data;
 	page.data = nullptr;
 }
 
-//Löscht die font nicht!
+//LÃ¶scht die font nicht!
 void destroyPageNoFont(Page& page){
 	for(WORD i=0; i < page.menu_count; ++i){
 		destroyMenu(*page.menus[i]);
@@ -64,7 +64,7 @@ void destroyPageNoFont(Page& page){
 	page.image_count = 0;
 }
 
-//Löscht die gespeicherte Font mit!
+//LÃ¶scht die gespeicherte Font mit!
 void destroyPage(Page& page){
 	for(WORD i=0; i < page.menu_count; ++i){
 		destroyMenu(*page.menus[i]);
@@ -81,10 +81,10 @@ void destroyPage(Page& page){
 	page.font = nullptr;
 }
 
-void updatePage(Page& page, HWND window){
+void updatePage(Page& page, Window* window){
 	for(WORD i=0; i < page.image_count; ++i){
 		ImageInfo& info = page.imageInfo[i];
-		ErrCheck(copyImageToWindow(window, *page.images[i], info.pos.x, info.pos.y, info.size.x, info.size.y));
+		ErrCheck(copyImageToWindow(window, *page.images[i], info.pos.x, info.pos.y, info.size.x-1, info.size.y-1));
 	}
 	for(WORD i=0; i < page.menu_count; ++i){
 		updateMenu(window, *(page.menus[i]), *page.font);

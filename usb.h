@@ -78,24 +78,27 @@ int readData(HANDLE hDevice, BYTE* data, DWORD length){
 }
 
 //Liest die Daten im Empfangspuffer eins nach dem anderen, liest solange bis ein CRLF am ende der Daten steht
-//Gibt -1 zurück, falls keien Daten im Empfangspuffer sind, oder 50Bytes überschritten wurden, oder API Fehler
+//Gibt 0 zurück, falls keine Daten im Empfangspuffer waren
+//Gibt -2 zurück, falls 50Bytes überschritten wurden, -1 wenn API Fehler, TODO -3 falls Timeout
+//TODO Timeout hinzufügen
+//TODO static_assert auf length <= 50, idk ob man das irgendwie machen kann... templates dammit...
 int readPacket(HANDLE hDevice, BYTE* data, DWORD length){
 	DWORD bytesRead;
 	DWORD currentRead = 0;
 	BYTE byte;
-	if(!ReadFile(hDevice, &byte, 1, &bytesRead, 0)){
-		std::cout << "Fehler beim Lesen der Daten! " << GetLastError() << std::endl;
+	if(!ReadFile(hDevice, &byte, 1, &bytesRead, NULL)){
+//		std::cerr << "Fehler beim Lesen der Daten! " << GetLastError() << std::endl;
 		return -1;
 	}
-	if(bytesRead <= 0) return -1;
+	if(bytesRead <= 0) return 0;
 	data[currentRead++] = byte;
 	while(1){
-		if(!ReadFile(hDevice, &byte, 1, &bytesRead, 0)){
-			std::cout << "Fehler beim Lesen der Daten! " << GetLastError() << std::endl;
+		if(!ReadFile(hDevice, &byte, 1, &bytesRead, NULL)){
+//			std::cerr << "Fehler beim Lesen der Daten! " << GetLastError() << std::endl;
 			return -1;
 		}
 		if(bytesRead > 0) data[currentRead++] = byte;
-		if(currentRead > 50) return -1;
+		if(currentRead > 50) return -2;
 		if(currentRead > 1 && data[currentRead-2] == 0x0D && data[currentRead-1] == 0x0A){
 			return currentRead;
 		}
@@ -104,7 +107,6 @@ int readPacket(HANDLE hDevice, BYTE* data, DWORD length){
 
 //Sendet die Daten mit allen nötigen zusätzlichen Zeichen (max. 48 Bytes Nutzdaten)
 //-1 falls Daten mehr wie 48 Byte enthalten oder API Fehler
-//TODO ErrCodes
 int sendPacket(HANDLE hDevice, BYTE* data, DWORD length){
 	if(length > 48) return -1;
 	BYTE packet[50];
@@ -130,22 +132,43 @@ void printPacket(BYTE* buffer, int length){
 	std::cout << std::endl;
 }
 
-//TODO Breche die Kommunikation nach einer Zeit ab, falls keine Antworten kommen oder es Falsche sind
-int initCommunication(HANDLE hDevice, BYTE* sendBuffer, BYTE* receiveBuffer){
+//Timeout in Milliksekunden TODO muss getestet werden
+ErrCode initCommunication(HANDLE hDevice, BYTE* sendBuffer, BYTE* receiveBuffer, long timeout){
 	int length;
 	strcpy((char*)sendBuffer, "USB");
 	sendPacket(hDevice, sendBuffer, sizeof("USB")-1);
-	while((length = readPacket(hDevice, receiveBuffer, 128)) < 1);
+	SYSTEMTIME tpBegin;
+	GetSystemTime(&tpBegin);
+	while((length = readPacket(hDevice, receiveBuffer, 128)) < 1){
+		switch(length){
+			case -1: return USB_BAD_PROTOCOL;
+			case -2: return INVALID_USB_PACKET;
+		}
+		SYSTEMTIME tpEnd;
+		GetSystemTime(&tpEnd);
+		long long time = systemTimeDiff(tpBegin, tpEnd);
+		if(time >= timeout) return USB_RECEIVE_TIMEOUT;
+	};
 #ifndef SILENT
 	printPacket(receiveBuffer, length);
 #endif
 	strcpy((char*)sendBuffer, "IV?");
 	sendPacket(hDevice, sendBuffer, sizeof("IV?")-1);
-	while((length = readPacket(hDevice, receiveBuffer, 128)) < 1);
+	GetSystemTime(&tpBegin);
+	while((length = readPacket(hDevice, receiveBuffer, 128)) < 1){
+		switch(length){
+			case -1: return USB_BAD_PROTOCOL;
+			case -2: return INVALID_USB_PACKET;
+		}
+		SYSTEMTIME tpEnd;
+		GetSystemTime(&tpEnd);
+		long long time = systemTimeDiff(tpBegin, tpEnd);
+		if(time >= timeout) return USB_RECEIVE_TIMEOUT;
+	};
 #ifndef SILENT
 	printPacket(receiveBuffer, length);
 #endif
-	return 0;
+	return SUCCESS;
 }
 
 /* Der Waterrower sollte nicht mit Packeten überlastet werden, daher wird empfohlen nur ca. alle 25ms ein Packet zu senden

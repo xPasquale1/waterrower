@@ -7,38 +7,40 @@
 
 #include "util.h"
 
+//TODO namespace?
+
 #define WINDOWFLAGSTYPE BYTE
-enum WINDOWFLAGS : WINDOWFLAGSTYPE{
+enum WINDOWFLAG : WINDOWFLAGSTYPE{
+	WINDOW_NONE = 0,
 	WINDOW_CLOSE = 1,
 	WINDOW_RESIZE = 2
 };
-struct WindowInfo{
-	WORD window_width = 800;
-	WORD window_height = 800;
-	WORD pixel_size = 1;
-	WINDOWFLAGSTYPE flags = 0;						//Zustand des Fensters (können mehrere sein)
-	ID2D1HwndRenderTarget* renderTarget = nullptr;	//Direct2D render Target
-	std::string windowClassName;					//Fensterklassen-Name
+//Hat viele Attribute die man auch Ã¼ber die win api abrufen kÃ¶nnte, aber diese extra zu speichern macht alles Ã¼bersichtlicher
+struct Window{
+	HWND handle;									//Fensterhandle
+	WORD windowWidth = 800;							//Fensterbreite
+	WORD windowHeight = 800;						//FensterhÃ¶he
+	DWORD* pixels;									//Pixelarray
+	WORD pixelSize = 1;								//GrÃ¶ÃŸe der Pixel in Bildschirmpixeln
+	WINDOWFLAG flags = WINDOW_NONE;					//Fensterflags
+	ID2D1HwndRenderTarget* renderTarget = nullptr;	//Direct 2D Rendertarget
+	std::string windowClassName;					//Ja, jedes Fenster hat seine eigene Klasse... TODO
 };
 
 #define APPLICATIONFLAGSTYPE BYTE
-enum APPLICATIONFLAGS : APPLICATIONFLAGSTYPE{
+enum APPLICATIONFLAG : APPLICATIONFLAGSTYPE{
 	APP_RUNNING=1,
 	APP_HAS_DEVICE=2
 };
 #define MAX_WINDOW_COUNT 10
 struct Application{
-	HWND windows[MAX_WINDOW_COUNT];				//Fenster handles der app
-	WindowInfo info[MAX_WINDOW_COUNT];			//Fensterinfos
-	uint* pixels[MAX_WINDOW_COUNT];				//Zugehörige Pixeldaten der Fenster
-	WORD window_count = 0;						//Anzahl der Fenster
-	APPLICATIONFLAGSTYPE flags = APP_RUNNING;	//Applikationsflags
+	APPLICATIONFLAG flags = APP_RUNNING;		//Applikationsflags
 	ID2D1Factory* factory = nullptr;			//Direct2D Factory
 }; static Application app;
 
-inline bool getAppFlag(APPLICATIONFLAGS flag){return(app.flags & flag);}
-inline void setAppFlag(APPLICATIONFLAGS flag){app.flags |= flag;}
-inline void resetAppFlag(APPLICATIONFLAGS flag){app.flags &= ~flag;}
+inline bool getAppFlag(APPLICATIONFLAG flag){return(app.flags & flag);}
+inline void setAppFlag(APPLICATIONFLAG flag){app.flags = (APPLICATIONFLAG)(app.flags | flag);}
+inline void resetAppFlag(APPLICATIONFLAG flag){app.flags = (APPLICATIONFLAG)(app.flags & ~flag);}
 
 inline ErrCode initApp(){
 	HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &app.factory);
@@ -49,94 +51,24 @@ inline ErrCode initApp(){
 	return SUCCESS;
 }
 
-inline ErrCode closeApp(){
-	for(WORD i=0; i < app.window_count; ++i){
-		if(!DestroyWindow(app.windows[i])){
-			std::cerr << GetLastError() << std::endl;
-			return GENERIC_ERROR;
-		}
-		if(!UnregisterClassA(app.info[i].windowClassName.c_str(), nullptr)){
-			std::cerr << GetLastError() << std::endl;
-			return GENERIC_ERROR;
-		}
-		app.info[i].renderTarget->Release();
-		delete[] app.pixels[i];
-	}
-	app.window_count = 0;
-	app.factory->Release();
-	return SUCCESS;
-}
-
-inline ErrCode getWindow(HWND window, WORD& index){
-	for(WORD i=0; i < app.window_count; ++i){
-		if(app.windows[i] == window){
-			index = i;
-			return SUCCESS;
-		}
-	}
-	return WINDOW_NOT_FOUND;
-}
-inline ErrCode setWindowFlag(HWND window, WINDOWFLAGS state){
-	ErrCode code; WORD idx;
-	code = getWindow(window, idx);
-	if(code) return code;
-	app.info[idx].flags |= state;
-	return SUCCESS;
-}
-inline ErrCode resetWindowFlag(HWND window, WINDOWFLAGS state){
-	ErrCode code; WORD idx;
-	code = getWindow(window, idx);
-	if(code) return code;
-	app.info[idx].flags &= ~state;
-	return SUCCESS;
-}
-
-//TODO Fehler melden
-inline bool getWindowFlag(HWND window, WINDOWFLAGS state){
-	WORD idx;
-	getWindow(window, idx);
-	return (app.info[idx].flags & state);
-}
-
-//TODO Fehler zurückgeben?
-//Gibt den nächsten Zustand des Fensters zurück, Anwendung z.B. while(getNextWindowState())...
-inline WINDOWFLAGS getNextWindowState(HWND window){
-	WORD idx = 0;
-	if(ErrCheck(getWindow(window, idx), "getNextWindowState") != SUCCESS) return (WINDOWFLAGS)0;
-	APPLICATIONFLAGSTYPE state = app.info[idx].flags & -app.info[idx].flags;
-	app.info[idx].flags &= ~state;
-	return (WINDOWFLAGS)state;
-}
-
-inline ErrCode resizeWindow(HWND window, WORD width, WORD height, WORD pixel_size){
-	for(WORD i=0; i < app.window_count; ++i){
-		if(app.windows[i] == window){
-			delete[] app.pixels[i];
-			app.info[i].window_width = width;
-			app.info[i].window_height = height;
-			app.info[i].pixel_size = pixel_size;
-			app.pixels[i] = new uint[width/pixel_size*height/pixel_size];
-			app.info[i].renderTarget->Resize({width, height});
-			return SUCCESS;
-		}
-	}
-	return WINDOW_NOT_FOUND;
-}
-
 typedef LRESULT (*window_callback_function)(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK default_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-//Setzt bei Erfolg den Parameter window zu einem gültigen window handle, auf welches man dann zugreifen kann
-ErrCode openWindow(HINSTANCE hInstance, LONG window_width, LONG window_height, LONG x, LONG y, WORD pixel_size, HWND& window, const char* name = "Window", window_callback_function callback = default_window_callback, HWND parentWindow = NULL){
+//Setzt bei Erfolg den Parameter window zu einem gÃ¼ltigen window, auf welches man dann zugreifen kann
+//window muss ein nullptr sein/kein vorhandenes window!
+ErrCode createWindow(HINSTANCE hInstance, LONG windowWidth, LONG windowHeight, LONG x, LONG y, WORD pixelSize, Window*& window, const char* name = "Window", window_callback_function callback = default_window_callback, HWND parentWindow = NULL){
 	//Erstelle Fenster Klasse
-	if(app.window_count >= MAX_WINDOW_COUNT) return TOO_MANY_WINDOWS;
+	if(window != nullptr) return CREATE_WINDOW;
+
+	window = new Window;
+
 	WNDCLASS window_class = {};
 	window_class.hInstance = hInstance;
 	window_class.style = CS_HREDRAW | CS_VREDRAW;
-	std::string className = "Window-Class" + std::to_string(app.window_count);
+	std::string className = "Window-Class-" + std::rand();	//TODO meh...
 	window_class.lpszClassName = className.c_str();
 	window_class.lpfnWndProc = callback;
 
-	app.info[app.window_count].windowClassName = className;
+	window->windowClassName = className;
 	//Registriere Fenster Klasse
 	if(!RegisterClass(&window_class)){
 		std::cerr << GetLastError() << std::endl;
@@ -145,21 +77,21 @@ ErrCode openWindow(HINSTANCE hInstance, LONG window_width, LONG window_height, L
 
 	RECT rect;
     rect.top = 0;
-    rect.bottom = window_height;
+    rect.bottom = windowHeight;
     rect.left = 0;
-    rect.right = window_width;
+    rect.right = windowWidth;
 	AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
 	uint w = rect.right - rect.left;
 	uint h = rect.bottom - rect.top;
 
 	//Erstelle das Fenster
-	app.windows[app.window_count] = CreateWindow(window_class.lpszClassName, name, WS_VISIBLE | WS_OVERLAPPEDWINDOW, x, y, w, h, parentWindow, NULL, hInstance, NULL);
-	if(window == NULL){
+	window->handle = CreateWindow(window_class.lpszClassName, name, WS_VISIBLE | WS_OVERLAPPEDWINDOW, x, y, w, h, parentWindow, NULL, hInstance, NULL);
+	if(window->handle == NULL){
 		std::cerr << GetLastError() << std::endl;
 		return CREATE_WINDOW;
 	}
-	window = app.windows[app.window_count];
-	app.info[app.window_count].flags = 0;
+
+	SetWindowLongPtr(window->handle, GWLP_USERDATA, (LONG_PTR)window);	//TODO idk ob das so ok ist, win32 doku sagt nicht viel darÃ¼ber aus...
 
 	D2D1_RENDER_TARGET_PROPERTIES properties = {};
 	properties.type = D2D1_RENDER_TARGET_TYPE_DEFAULT;
@@ -170,80 +102,131 @@ ErrCode openWindow(HINSTANCE hInstance, LONG window_width, LONG window_height, L
 	properties.usage = D2D1_RENDER_TARGET_USAGE_NONE;
 	properties.minLevel = D2D1_FEATURE_LEVEL_DEFAULT;
 	D2D1_HWND_RENDER_TARGET_PROPERTIES hwndProperties = {};
-	hwndProperties.hwnd = window;
-	hwndProperties.pixelSize = D2D1::SizeU(window_width, window_height);
+	hwndProperties.hwnd = window->handle;
+	hwndProperties.pixelSize = D2D1::SizeU(windowWidth, windowHeight);
 	hwndProperties.presentOptions = D2D1_PRESENT_OPTIONS_IMMEDIATELY;
-    HRESULT hr = app.factory->CreateHwndRenderTarget(properties, hwndProperties, &app.info[app.window_count].renderTarget);
+    HRESULT hr = app.factory->CreateHwndRenderTarget(properties, hwndProperties, &window->renderTarget);
     if(hr){
 		std::cerr << hr << std::endl;
 		return INIT_RENDER_TARGET;
     }
 
-	WORD buffer_width = window_width/pixel_size;
-	WORD buffer_height = window_height/pixel_size;
-	app.info[app.window_count].pixel_size = pixel_size;
-	app.pixels[app.window_count] = new uint[buffer_width*buffer_height];
-	app.window_count++;
+	WORD buffer_width = windowWidth/pixelSize;
+	WORD buffer_height = windowHeight/pixelSize;
+	window->pixelSize = pixelSize;
+	window->pixels = new DWORD[buffer_width*buffer_height];
+	window->windowWidth = windowWidth;
+	window->windowHeight = windowHeight;
 	return SUCCESS;
 }
 
-ErrCode closeWindow(HWND window){
-	for(WORD i=0; i < app.window_count; ++i){
-		if(app.windows[i] == window){
-			DestroyWindow(app.windows[i]);
-			app.info[i].renderTarget->Release();
-			if(!UnregisterClassA(app.info[i].windowClassName.c_str(), nullptr)){
-				std::cerr << GetLastError() << std::endl;
-				return GENERIC_ERROR;
-			}
-			delete[] app.pixels[i];
-			for(WORD j=i; j < app.window_count-1; ++j){
-				app.windows[j] = app.windows[j+1];
-				app.pixels[j] = app.pixels[j+1];
-				app.info[j] = app.info[j+1];
-			}
-			app.window_count--;
-			return SUCCESS;
-		}
+ErrCode destroyWindow(Window*& window){
+	if(window == nullptr) return WINDOW_NOT_FOUND;
+	if(!UnregisterClassA(window->windowClassName.c_str(), NULL)){
+		std::cerr << GetLastError() << std::endl;
+		return GENERIC_ERROR;
 	}
-	return WINDOW_NOT_FOUND;
+	DestroyWindow(window->handle);
+	delete[] window->pixels;
+	delete window;
+	window = nullptr;
+	return SUCCESS;
 }
 
+inline ErrCode destroyApp(){
+	app.factory->Release();
+	return SUCCESS;
+}
+
+inline ErrCode setWindowFlag(Window* window, WINDOWFLAG state){
+	if(window == nullptr) return WINDOW_NOT_FOUND;
+	window->flags = (WINDOWFLAG)(window->flags | state);
+	return SUCCESS;
+}
+inline ErrCode resetWindowFlag(Window* window, WINDOWFLAG state){
+	if(window == nullptr) return WINDOW_NOT_FOUND;
+	window->flags = (WINDOWFLAG)(window->flags & ~state);
+	return SUCCESS;
+}
+inline bool getWindowFlag(Window* window, WINDOWFLAG state){
+	if(window == nullptr) return false;
+	return (window->flags & state);
+}
+
+//TODO Sollte ERRCODE zurÃ¼ckgeben und WINDOWFLAG als Referenzparameter Ã¼bergeben bekommen
+//Gibt den nÃ¤chsten Zustand des Fensters zurÃ¼ck und lÃ¶scht diesen anschlieÃŸend, Anwendung z.B. while(state = getNextWindowState() != WINDOW_NONE)...
+inline WINDOWFLAG getNextWindowState(Window* window){
+	if(window == nullptr) return WINDOW_NONE;
+	WINDOWFLAG flag = (WINDOWFLAG)(window->flags & -window->flags);
+	window->flags = (WINDOWFLAG)(window->flags & ~flag);
+	return flag;
+}
+
+inline ErrCode resizeWindow(Window* window, WORD width, WORD height, WORD pixel_size){
+	if(window == nullptr) return WINDOW_NOT_FOUND;
+	window->windowWidth = width;
+	window->windowHeight = height;
+	window->pixelSize = pixel_size;
+	delete[] window->pixels;
+	window->pixels = new DWORD[width/pixel_size*height/pixel_size];
+	window->renderTarget->Resize({width, height});
+	return SUCCESS;
+}
+
+//TODO anstatt solch eine komplexe Funktion in createWindow rein zu geben, kÃ¶nnte man seine eigene schreiben mit Window* und uMsg,... als Parameter
+//und diese default funktion ruft diese dann optional nur auf
 LRESULT CALLBACK default_window_callback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
+	Window* window = (Window*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+	if(window == nullptr) return DefWindowProc(hwnd, uMsg, wParam, lParam);	//TODO das ist ein Fehler, wie melden aber?
 	switch(uMsg){
-	case WM_DESTROY:{
-		ErrCheck(setWindowFlag(hwnd, WINDOW_CLOSE), "setze close Fensterstatus");
-		break;
-	}
-	case WM_SIZE:{
-		UINT width = LOWORD(lParam);
-		UINT height = HIWORD(lParam);
-		if(!width || !height) break;
-		ErrCheck(setWindowFlag(hwnd, WINDOW_RESIZE), "setzte resize Fensterstatus");
-		ErrCheck(resizeWindow(hwnd, width, height, 1), "Fenster skalieren");
-        break;
-	}
-	case WM_MOUSEMOVE:{
-		for(WORD i=0; i < app.window_count; ++i){
-			if(app.windows[i] == hwnd){
-				mouse.pos.x = GET_X_LPARAM(lParam)/app.info[i].pixel_size;
-				mouse.pos.y = GET_Y_LPARAM(lParam)/app.info[i].pixel_size;
-			}
+		case WM_DESTROY:{
+			ErrCheck(setWindowFlag(window, WINDOW_CLOSE), "setze close Fensterstatus");
+			break;
 		}
-		break;
-	}
+		case WM_SIZE:{
+			UINT width = LOWORD(lParam);
+			UINT height = HIWORD(lParam);
+			if(!width || !height) break;
+			ErrCheck(setWindowFlag(window, WINDOW_RESIZE), "setzte resize Fensterstatus");
+			ErrCheck(resizeWindow(window, width, height, 1), "Fenster skalieren");
+			break;
+		}
+		case WM_LBUTTONDOWN:{
+			if(!getButton(mouse, MOUSE_LMB)){
+
+			};
+			setButton(mouse, MOUSE_LMB);
+			break;
+		}
+		case WM_LBUTTONUP:{
+			resetButton(mouse, MOUSE_LMB);
+			break;
+		}
+		case WM_RBUTTONDOWN:{
+			if(!getButton(mouse, MOUSE_RMB)){
+
+			};
+			setButton(mouse, MOUSE_RMB);
+			break;
+		}
+		case WM_RBUTTONUP:{
+			resetButton(mouse, MOUSE_RMB);
+			break;
+		}
+		case WM_MOUSEMOVE:{
+			mouse.pos.x = GET_X_LPARAM(lParam)/window->pixelSize;
+			mouse.pos.y = GET_Y_LPARAM(lParam)/window->pixelSize;
+			break;
+		}
 	}
 	return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-inline void getMessages()noexcept{
+inline void getMessages(Window* window)noexcept{
 	MSG msg;
-	for(WORD i=0; i < app.window_count; ++i){
-		HWND window = app.windows[i];
-		while(PeekMessage(&msg, window, 0, 0, PM_REMOVE)){
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
+	while(PeekMessage(&msg, window->handle, 0, 0, PM_REMOVE)){
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
 	}
 }
 
@@ -253,143 +236,56 @@ inline constexpr BYTE R(uint color){return BYTE(color>>16);}
 inline constexpr BYTE G(uint color){return BYTE(color>>8);}
 inline constexpr BYTE B(uint color){return BYTE(color);}
 
-inline ErrCode clearWindow(HWND window)noexcept{
-	for(WORD i=0; i < app.window_count; ++i){
-		if(app.windows[i] == window){
-			uint buffer_width = app.info[i].window_width/app.info[i].pixel_size;
-			uint buffer_height = app.info[i].window_height/app.info[i].pixel_size;
-			uint* pixels = app.pixels[i];
-			for(uint y=0; y < buffer_height; ++y){
-				for(uint x=0; x < buffer_width; ++x){
-					pixels[y*buffer_width+x] = RGBA(0, 0, 0);
-				}
-			}
-			return SUCCESS;
+inline ErrCode clearWindow(Window* window)noexcept{
+	if(window == nullptr) return WINDOW_NOT_FOUND;
+	WORD buffer_width = window->windowWidth/window->pixelSize;
+	WORD buffer_height = window->windowHeight/window->pixelSize;
+	for(WORD y=0; y < buffer_height; ++y){
+		for(WORD x=0; x < buffer_width; ++x){
+			window->pixels[y*buffer_width+x] = RGBA(0, 0, 0);
 		}
 	}
-	return WINDOW_NOT_FOUND;
+	return SUCCESS;
 }
 
-inline void clearWindows()noexcept{
-	for(WORD i=0; i < app.window_count; ++i){
-		uint buffer_width = app.info[i].window_width/app.info[i].pixel_size;
-		uint buffer_height = app.info[i].window_height/app.info[i].pixel_size;
-		uint* pixels = app.pixels[i];
-		for(uint y=0; y < buffer_height; ++y){
-			for(uint x=0; x < buffer_width; ++x){
-				pixels[y*buffer_width+x] = RGBA(0, 0, 0);
-			}
+//TODO bitmap kann man bestimmt auch im Window speichern und auf dieser dann rummalen
+inline ErrCode drawWindow(Window* window)noexcept{
+	if(window == nullptr) return WINDOW_NOT_FOUND;
+	if(window->windowWidth == 0 || window->windowHeight == 0) return GENERIC_ERROR;
+	WORD buffer_width = window->windowWidth/window->pixelSize;
+	WORD buffer_height = window->windowHeight/window->pixelSize;
+	ID2D1Bitmap* bitmap;
+	D2D1_BITMAP_PROPERTIES properties = {};
+	properties.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
+	properties.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+	properties.dpiX = 96;
+	properties.dpiY = 96;
+	window->renderTarget->BeginDraw();
+	HRESULT hr = window->renderTarget->CreateBitmap({buffer_width, buffer_height}, window->pixels, buffer_width*4, properties, &bitmap);
+	if(hr){
+		std::cerr << hr << std::endl;
+		exit(-2);
+	}
+	window->renderTarget->DrawBitmap(bitmap, D2D1::RectF(0, 0, window->windowWidth, window->windowHeight), 1, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, D2D1::RectF(0, 0, buffer_width, buffer_height));
+	bitmap->Release();
+	window->renderTarget->EndDraw();
+	return SUCCESS;
+}
+
+inline ErrCode drawRectangle(Window* window, uint x, uint y, uint dx, uint dy, uint color)noexcept{
+	if(window == nullptr) return WINDOW_NOT_FOUND;
+	WORD buffer_width = window->windowWidth/window->pixelSize;
+	for(WORD i=y; i < y+dy; ++i){
+		for(WORD j=x; j < x+dx; ++j){
+			window->pixels[i*buffer_width+j] = color;
 		}
 	}
+	return SUCCESS;
 }
 
-inline ErrCode drawWindow(HWND window)noexcept{
-	for(WORD i=0; i < app.window_count; ++i){
-		if(app.windows[i] == window){
-			if(app.info[i].window_width == 0 || app.info[i].window_height == 0) return SUCCESS;
-			uint buffer_width = app.info[i].window_width/app.info[i].pixel_size;
-			uint buffer_height = app.info[i].window_height/app.info[i].pixel_size;
-			ID2D1Bitmap* bitmap;
-			D2D1_BITMAP_PROPERTIES properties = {};
-			properties.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
-			properties.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
-			properties.dpiX = 96;
-			properties.dpiY = 96;
-			app.info[i].renderTarget->BeginDraw();
-			HRESULT hr = app.info[i].renderTarget->CreateBitmap({buffer_width, buffer_height}, app.pixels[i], buffer_width*4, properties, &bitmap);
-			if(hr){
-				std::cerr << hr << std::endl;
-				exit(-2);
-			}
-			WORD width = app.info[i].window_width;
-			WORD height = app.info[i].window_height;
-			app.info[i].renderTarget->DrawBitmap(bitmap, D2D1::RectF(0, 0, width, height), 1, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, D2D1::RectF(0, 0, buffer_width, buffer_height));
-			bitmap->Release();
-			app.info[i].renderTarget->EndDraw();
-			return SUCCESS;
-		}
-	}
-	return WINDOW_NOT_FOUND;
-}
-
-inline void drawWindows()noexcept{
-	for(WORD i=0; i < app.window_count; ++i){
-		if(app.info[i].window_width == 0 || app.info[i].window_height == 0) continue;
-		uint buffer_width = app.info[i].window_width/app.info[i].pixel_size;
-		uint buffer_height = app.info[i].window_height/app.info[i].pixel_size;
-		ID2D1Bitmap* bitmap;
-		D2D1_BITMAP_PROPERTIES properties = {};
-		properties.pixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
-		properties.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
-		properties.dpiX = 96;
-		properties.dpiY = 96;
-		app.info[i].renderTarget->BeginDraw();
-		HRESULT hr = app.info[i].renderTarget->CreateBitmap({buffer_width, buffer_height}, app.pixels[i], buffer_width*4, properties, &bitmap);
-		if(hr){
-			std::cerr << hr << std::endl;
-			exit(-2);
-		}
-		WORD width = app.info[i].window_width;
-		WORD height = app.info[i].window_height;
-		app.info[i].renderTarget->DrawBitmap(bitmap, D2D1::RectF(0, 0, width, height), 1, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, D2D1::RectF(0, 0, buffer_width, buffer_height));
-		bitmap->Release();
-		app.info[i].renderTarget->EndDraw();;
-	}
-}
-
-inline ErrCode drawRectangle(HWND window, uint x, uint y, uint dx, uint dy, uint color)noexcept{
-	for(WORD i=0; i < app.window_count; ++i){
-		if(app.windows[i] == window){
-			uint buffer_width = app.info[i].window_width/app.info[i].pixel_size;
-			uint* pixels = app.pixels[i];
-			for(uint i=y; i < y+dy; ++i){
-				for(uint j=x; j < x+dx; ++j){
-					pixels[i*buffer_width+j] = color;
-				}
-			}
-			return SUCCESS;
-		}
-	}
-	return WINDOW_NOT_FOUND;
-}
-
-inline void drawRectangle(WORD idx, uint x, uint y, uint dx, uint dy, uint color)noexcept{
-	uint buffer_width = app.info[idx].window_width/app.info[idx].pixel_size;
-	uint* pixels = app.pixels[idx];
-	for(uint i=y; i < y+dy; ++i){
-		for(uint j=x; j < x+dx; ++j){
-			pixels[i*buffer_width+j] = color;
-		}
-	}
-}
-
-inline ErrCode drawLine(HWND window, WORD start_x, WORD start_y, WORD end_x, WORD end_y, uint color)noexcept{
-	for(WORD i=0; i < app.window_count; ++i){
-		if(app.windows[i] == window){
-			uint buffer_width = app.info[i].window_width/app.info[i].pixel_size;
-			uint* pixels = app.pixels[i];
-		    int dx = end_x-start_x;
-		    int dy = end_y-start_y;
-		    int steps = abs(dx) > abs(dy) ? abs(dx) : abs(dy);
-		    float xinc = dx/(float)steps;
-		    float yinc = dy/(float)steps;
-		    float x = start_x;
-		    float y = start_y;
-		    for(int i = 0; i <= steps; ++i){
-		    	pixels[(int)y*buffer_width+(int)x] = color;
-		        x += xinc;
-		        y += yinc;
-		    }
-			return SUCCESS;
-		}
-	}
-	return WINDOW_NOT_FOUND;
-}
-
-//idx ist der window index
-inline void drawLine(WORD idx, WORD start_x, WORD start_y, WORD end_x, WORD end_y, uint color)noexcept{
-	uint buffer_width = app.info[idx].window_width/app.info[idx].pixel_size;
-	uint* pixels = app.pixels[idx];
+inline ErrCode drawLine(Window* window, WORD start_x, WORD start_y, WORD end_x, WORD end_y, uint color)noexcept{
+	if(window == nullptr) return WINDOW_NOT_FOUND;
+	WORD buffer_width = window->windowWidth/window->pixelSize;
 	int dx = end_x-start_x;
 	int dy = end_y-start_y;
 	int steps = abs(dx) > abs(dy) ? abs(dx) : abs(dy);
@@ -398,10 +294,11 @@ inline void drawLine(WORD idx, WORD start_x, WORD start_y, WORD end_x, WORD end_
 	float x = start_x;
 	float y = start_y;
 	for(int i = 0; i <= steps; ++i){
-		pixels[(int)y*buffer_width+(int)x] = color;
+		window->pixels[(int)y*buffer_width+(int)x] = color;
 		x += xinc;
 		y += yinc;
-	}
+	 }
+	return SUCCESS;
 }
 
 struct Image{
@@ -413,7 +310,7 @@ struct Image{
 ErrCode loadImage(const char* name, Image& image){
 	std::fstream file; file.open(name, std::ios::in);
 	if(!file.is_open()) return FILE_NOT_FOUND;
-	//Lese Breite und Höhe
+	//Lese Breite und HÃ¶he
 	std::string word;
 	file >> word;
 	image.width = std::atoi(word.c_str());
@@ -427,7 +324,7 @@ ErrCode loadImage(const char* name, Image& image){
 	if(!file.is_open()) return FILE_NOT_FOUND;
 	file.seekg(pos);
 	char val[4];
-	file.read(&val[0], 1);	//Überspringe letztes Leerzeichen
+	file.read(&val[0], 1);	//Ã¼berspringe letztes Leerzeichen
 	for(uint i=0; i < image.width*image.height; ++i){
 		file.read(&val[0], 1);
 		file.read(&val[1], 1);
@@ -452,65 +349,44 @@ inline uint getImage(Image& image, float x, float y){
 }
 
 //Kopiert das gesamte Image in den angegebenen Bereich von start_x bis end_x und start_y bis end_y
-//TODO Kopiere nicht das gesamte Image, sondern auch das sollte man angeben können
-ErrCode copyImageToWindow(HWND window, Image& image, int start_x, int start_y, int end_x, int end_y){
-	for(WORD i=0; i < app.window_count; ++i){
-		if(app.windows[i] == window){
-			uint buffer_width = app.info[i].window_width/app.info[i].pixel_size;
-			uint* pixels = app.pixels[i];
-			for(int y=start_y; y < end_y; ++y){
-				float scaled_y = (float)(y-start_y)/(end_y-start_y);
-				for(int x=start_x; x < end_x; ++x){
-					uint ry = scaled_y*image.height;
-					uint rx = (float)(x-start_x)/(end_x-start_x)*(image.width-1);
-					uint color = image.data[ry*image.width+rx];
-					if(A(color) > 0) pixels[y*buffer_width+x] = color;
-				}
-			}
-			return SUCCESS;
-		}
-	}
-	return WINDOW_NOT_FOUND;
-}
-
-//idx ist der window index
-inline void copyImageToWindow(WORD window_idx, Image& image, int start_x, int start_y, int end_x, int end_y){
-	uint buffer_width = app.info[window_idx].window_width/app.info[window_idx].pixel_size;
-	uint* pixels = app.pixels[window_idx];
+//TODO Kopiere nicht das gesamte Image, sondern auch das sollte man angeben kÃ¶nnen
+ErrCode copyImageToWindow(Window* window, Image& image, WORD start_x, WORD start_y, WORD end_x, WORD end_y){
+	if(window == nullptr) return WINDOW_NOT_FOUND;
+	WORD buffer_width = window->windowWidth/window->pixelSize;
 	for(int y=start_y; y < end_y; ++y){
-		float scaled_y = (float)(y-start_y)/(end_y-start_y);
+		WORD ry = (float)(y-start_y)/(end_y-start_y)*image.height;
 		for(int x=start_x; x < end_x; ++x){
-			uint ry = scaled_y*image.height;
-			uint rx = (float)(x-start_x)/(end_x-start_x)*(image.width-1);
-			uint color = image.data[ry*image.width+rx];
-			if(A(color) > 0) pixels[y*buffer_width+x] = color;
+			WORD rx = (float)(x-start_x)/(end_x-start_x)*(image.width-1);
+			DWORD color = image.data[ry*image.width+rx];
+			if(A(color) > 0) window->pixels[y*buffer_width+x] = color;
 		}
 	}
+	return SUCCESS;
 }
 
-//Funktion testet ob jeder pixel im gültigen Fensterbereich liegt! idx ist der window index
-inline void copyImageToWindowSave(WORD window_idx, Image& image, int start_x, int start_y, int end_x, int end_y){
-	uint buffer_width = app.info[window_idx].window_width/app.info[window_idx].pixel_size;
-	uint buffer_height = app.info[window_idx].window_height/app.info[window_idx].pixel_size;
-	uint* pixels = app.pixels[window_idx];
+//Funktion testet ob jeder pixel im gÃ¼ltigen Fensterbereich liegt! idx ist der window index
+ErrCode copyImageToWindowSave(Window* window, Image& image, WORD start_x, WORD start_y, WORD end_x, WORD end_y){
+	if(window == nullptr) return WINDOW_NOT_FOUND;
+	WORD buffer_width = window->windowWidth/window->pixelSize;
+	WORD buffer_height = window->windowHeight/window->pixelSize;
 	for(int y=start_y; y < end_y; ++y){
 		if(y < 0 || y >= (int)buffer_height) continue;
-		float scaled_y = (float)(y-start_y)/(end_y-start_y);
+		WORD ry = (float)(y-start_y)/(end_y-start_y)*image.height;
 		for(int x=start_x; x < end_x; ++x){
 			if(x < 0 || x >= (int)buffer_width) continue;
-			uint ry = scaled_y*image.height;
-			uint rx = (float)(x-start_x)/(end_x-start_x)*(image.width-1);
-			uint color = image.data[ry*image.width+rx];
-			if(A(color) > 0) pixels[y*buffer_width+x] = color;
+			WORD rx = (float)(x-start_x)/(end_x-start_x)*(image.width-1);
+			DWORD color = image.data[ry*image.width+rx];
+			if(A(color) > 0) window->pixels[y*buffer_width+x] = color;
 		}
 	}
+	return SUCCESS;
 }
 
 struct Font{
 	Image image;
-	ivec2 char_size;		//Größe eines Symbols im Image
-	WORD font_size = 12;	//Größe der Symbole in Pixel
-	BYTE char_sizes[96];	//Größe der Symbole in x-Richtung
+	ivec2 char_size;		//GrÃ¶ÃŸe eines Symbols im Image
+	WORD font_size = 12;	//GrÃ¶ÃŸe der Symbole in Pixel
+	BYTE char_sizes[96];	//GrÃ¶ÃŸe der Symbole in x-Richtung
 };
 
 ErrCode loadFont(const char* path, Font& font, ivec2 char_size){
@@ -535,7 +411,7 @@ ErrCode loadFont(const char* path, Font& font, ivec2 char_size){
 	return SUCCESS;
 }
 
-//Gibts zurück wie viele Pixel der Text unter der gegebenen Font benötigt
+//Gibts zurÃ¼ck wie viele Pixel der Text unter der gegebenen Font benÃ¶tigt
 WORD getStringFontSize(Font& font, std::string& text){
 	float div = (float)font.char_size.y/font.font_size;
 	WORD offset = 0;
@@ -546,56 +422,30 @@ WORD getStringFontSize(Font& font, std::string& text){
 	return offset;
 }
 
-//Gibt zurück wie breit das Symbol war das gezeichnet wurde
-uint drawFontChar(HWND window, Font& font, char symbol, uint start_x, uint start_y){
-	for(WORD i=0; i < app.window_count; ++i){
-		if(app.windows[i] == window){
-			uint idx = (symbol-32);
-			float div = (float)font.char_size.y/font.font_size;
-			uint end_x = start_x+font.char_sizes[idx]/div;
-			uint end_y = start_y+font.font_size;
-			uint x_offset = (idx%16)*font.char_size.x;
-			uint y_offset = (idx/16)*font.char_size.y;
-			uint buffer_width = app.info[i].window_width/app.info[i].pixel_size;
-			uint* pixels = app.pixels[i];
-			for(uint y=start_y; y < end_y; ++y){
-				float scaled_y = (float)(y-start_y)/(end_y-start_y);
-				for(uint x=start_x; x < end_x; ++x){
-					uint ry = scaled_y*font.char_size.y;
-					uint rx = (float)(x-start_x)/(end_x-start_x)*(font.char_sizes[idx]-1);
-					uint color = font.image.data[(ry+y_offset)*font.image.width+rx+x_offset];
-					if(A(color) > 0) pixels[y*buffer_width+x] = color;
-				}
-			}
-			return end_x-start_x;
-		}
-	}
-	return 0;
-}
-
-//Wie oben nur ist idx der Fenster index
-WORD drawFontChar(WORD idx, Font& font, char symbol, uint start_x, uint start_y){
-	uint val = (symbol-32);
+//Gibt zurÃ¼ck wie breit das Symbol war das gezeichnet wurde
+//TODO Errors? Ã¼bergebe symbol grÃ¶ÃŸe als Referenz Parameter
+uint drawFontChar(Window* window, Font& font, char symbol, uint start_x, uint start_y){
+	if(window == nullptr) return 0;
+	uint idx = (symbol-32);
 	float div = (float)font.char_size.y/font.font_size;
-	uint end_x = start_x+font.char_sizes[val]/div;
+	uint end_x = start_x+font.char_sizes[idx]/div;
 	uint end_y = start_y+font.font_size;
-	uint x_offset = (val%16)*font.char_size.x;
-	uint y_offset = (val/16)*font.char_size.y;
-	uint buffer_width = app.info[idx].window_width/app.info[idx].pixel_size;
-	uint* pixels = app.pixels[idx];
+	uint x_offset = (idx%16)*font.char_size.x;
+	uint y_offset = (idx/16)*font.char_size.y;
+	uint buffer_width = window->windowWidth/window->pixelSize;
 	for(uint y=start_y; y < end_y; ++y){
 		float scaled_y = (float)(y-start_y)/(end_y-start_y);
 		for(uint x=start_x; x < end_x; ++x){
 			uint ry = scaled_y*font.char_size.y;
-			uint rx = (float)(x-start_x)/(end_x-start_x)*(font.char_sizes[val]-1);
+			uint rx = (float)(x-start_x)/(end_x-start_x)*(font.char_sizes[idx]-1);
 			uint color = font.image.data[(ry+y_offset)*font.image.width+rx+x_offset];
-			if(A(color) > 0) pixels[y*buffer_width+x] = color;
+			if(A(color) > 0) window->pixels[y*buffer_width+x] = color;
 		}
 	}
 	return end_x-start_x;
 }
 
-//Zerstört eine im Heap allokierte Font und alle weiteren allokierten Elemente
+//ZerstÃ¶rt eine im Heap allokierte Font und alle weiteren allokierten Elemente
 void destroyFont(Font*& font){
 	destroyImage(font->image);
 	delete font;
@@ -612,7 +462,7 @@ enum BUTTONFLAGS{
 	BUTTON_DISABLED=32
 };
 struct Button{
-	ErrCode (*event)(BYTE*) = _defaultEvent;	//Funktionspointer zu einer Funktion die gecallt werden soll wenn der Button gedrückt wird
+	ErrCode (*event)(BYTE*) = _defaultEvent;	//Funktionspointer zu einer Funktion die gecallt werden soll wenn der Button gedrÃ¼ckt wird
 	std::string text;
 	Image* image = nullptr;
 	Image* disabled_image = nullptr;
@@ -656,7 +506,7 @@ inline void buttonsClicked(Button* buttons, WORD button_count){
 	}
 }
 
-inline void drawButtons(HWND window, Font& font, Button* buttons, WORD button_count){
+inline void drawButtons(Window* window, Font& font, Button* buttons, WORD button_count){
 	for(WORD i=0; i < button_count; ++i){
 		Button& b = buttons[i];
 		if(!getButtonFlag(b, BUTTON_VISIBLE)) continue;
@@ -697,7 +547,7 @@ inline void drawButtons(HWND window, Font& font, Button* buttons, WORD button_co
 	}
 }
 
-inline void updateButtons(HWND window, Font& font, Button* buttons, WORD button_count){
+inline void updateButtons(Window* window, Font& font, Button* buttons, WORD button_count){
 	buttonsClicked(buttons, button_count);
 	drawButtons(window, font, buttons, button_count);
 }
@@ -717,12 +567,12 @@ enum MENUFLAGS{
 #define MAX_STRINGS 20
 #define MAX_IMAGES 5
 struct Menu{
-	Image* images[MAX_IMAGES];	//Sind für die Buttons
+	Image* images[MAX_IMAGES];	//Sind fÃ¼r die Buttons
 	BYTE image_count = 0;
 	Button buttons[MAX_BUTTONS];
 	BYTE button_count = 0;
-	BYTE flags = MENU_OPEN;	//Bits: offen, toggle bit für offen, Rest ungenutzt
-	ivec2 pos = {};			//TODO Position in Bildschirmpixelkoordinaten
+	BYTE flags = MENU_OPEN;		//Bits: offen, toggle bit fÃ¼r offen, Rest ungenutzt
+	ivec2 pos = {};				//TODO Position in Bildschirmpixelkoordinaten
 	Label labels[MAX_STRINGS];
 	BYTE label_count = 0;
 };
@@ -734,7 +584,8 @@ void destroyMenu(Menu& menu){
 }
 
 inline constexpr bool getMenuFlag(Menu& menu, MENUFLAGS state){return (menu.flags&state);}
-inline void updateMenu(HWND window, Menu& menu, Font& font){
+
+inline void updateMenu(Window* window, Menu& menu, Font& font){
 	if(getMenuFlag(menu, MENU_OPEN)){
 		updateButtons(window, font, menu.buttons, menu.button_count);
 		for(WORD i=0; i < menu.label_count; ++i){
