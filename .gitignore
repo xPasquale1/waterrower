@@ -2,3 +2,6 @@
 Debug/waterrower.exe
 *.o
 /Debug/
+.vscode/launch.json
+.vscode/tasks.json
+main.exe
