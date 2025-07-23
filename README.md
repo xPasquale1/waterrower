@@ -1,6 +1,6 @@
 # Waterrower
 Ein für Windows entwickeltes Programm um das Training mit einem Waterrower zu verbessern.
-![alt text](https://github.com/xPasquale1/waterrower/blob/main/position_example.png "Applikation")
+![alt text](https://github.com/xPasquale1/waterrower/blob/main/images/ref.png "Applikation")
 
 ## Features
 
