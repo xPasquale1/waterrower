@@ -296,7 +296,7 @@ void displayDataPage(Window* window){
 	main_page.menus[0]->labels[2].text = "Durchschnittlich: " + intToString(rowingData.ms_avg) + "m/s";
 	main_page.menus[0]->labels[3].text = "Zeit: " + intToString(rowingData.time.hrs, 0) + ':' + intToString(rowingData.time.min, 0) + ':' + intToString(rowingData.time.sec, 0);
 	
-	Window* statWindow = (Window*)main_page.data;
+	Window* statWindow = *(Window**)main_page.data;
 	if(statWindow == nullptr) return;
 	WORD offset = 0;
 	WORD window_idx;
